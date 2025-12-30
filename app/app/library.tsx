@@ -8,6 +8,7 @@ import {
   Animated,
   Easing,
   Alert,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,25 @@ import { useAppTheme } from '@/theme/ThemeProvider';
 import { useWorkouts } from '@/hooks/useWorkouts';
 import { formatDate } from '@/utils/formatting';
 import { EXERCISE_CATALOG } from '@/src/data/exercises';
+
+// Helper pour les alertes cross-platform
+const showConfirm = (
+  title: string,
+  message: string,
+  onConfirm: () => void
+) => {
+  if (Platform.OS === 'web') {
+    // eslint-disable-next-line no-alert
+    if (window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: onConfirm },
+    ]);
+  }
+};
 
 export default function LibraryScreen() {
   const { theme, mode } = useAppTheme();
@@ -84,20 +104,13 @@ export default function LibraryScreen() {
   };
 
   const handleDelete = (workoutId: number, title: string) => {
-    Alert.alert(
+    showConfirm(
       'Supprimer la séance',
       `Veux-tu vraiment supprimer "${title || 'Sans titre'}" ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-            deleteWorkout(workoutId);
-          },
-        },
-      ]
+      () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        deleteWorkout(workoutId);
+      }
     );
   };
 

@@ -111,6 +111,14 @@ export async function search(query: string, limit = 20): Promise<SearchResult> {
   return response.json();
 }
 
+/**
+ * Rechercher uniquement des utilisateurs (pour la messagerie)
+ */
+export async function searchUsers(query: string, limit = 20): Promise<SuggestedUser[]> {
+  const result = await search(query, limit);
+  return result.users;
+}
+
 
 
 

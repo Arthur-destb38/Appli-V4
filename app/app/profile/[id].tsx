@@ -27,20 +27,24 @@ import {
   followUser,
   unfollowUser,
 } from '@/services/profileApi';
-
-const CURRENT_USER_ID = 'guest-user';
+import { createOrGetConversation } from '@/services/messagingApi';
+import { useUserProfile } from '@/hooks/useUserProfile';
 
 export default function ProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { profile: currentUserProfile } = useUserProfile();
+
+  const CURRENT_USER_ID = currentUserProfile?.id || 'guest-user';
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<UserPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [messageLoading, setMessageLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts');
 
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -117,6 +121,22 @@ export default function ProfileScreen() {
       console.error('Failed to toggle follow:', error);
     } finally {
       setFollowLoading(false);
+    }
+  };
+
+  const handleMessagePress = async () => {
+    if (!profile || !CURRENT_USER_ID || messageLoading) return;
+    
+    setMessageLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    
+    try {
+      const response = await createOrGetConversation(CURRENT_USER_ID, profile.id);
+      router.push(`/messages/${response.conversation.id}?participantId=${profile.id}`);
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+    } finally {
+      setMessageLoading(false);
     }
   };
 
@@ -309,8 +329,17 @@ export default function ProfileScreen() {
                       </>
                     )}
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.messageBtn} activeOpacity={0.7}>
-                    <Ionicons name="chatbubble" size={18} color="#fff" />
+                  <TouchableOpacity 
+                    style={styles.messageBtn} 
+                    activeOpacity={0.7}
+                    onPress={handleMessagePress}
+                    disabled={messageLoading}
+                  >
+                    {messageLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Ionicons name="chatbubble" size={18} color="#fff" />
+                    )}
                   </TouchableOpacity>
                 </>
               )}

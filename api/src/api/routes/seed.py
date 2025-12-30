@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 from src.api.db import get_engine
 from src.api.models import (
     User, Share, Follower, Workout, WorkoutExercise, 
-    Set, Exercise, Like, Notification, Comment
+    Set, Exercise, Like, Notification, Comment, Conversation, Message
 )
 
 router = APIRouter(prefix="/seed", tags=["seed"])
@@ -394,6 +394,171 @@ def seed_demo_data():
                 "likes_created": created_likes,
                 "comments_created": created_comments,
                 "notifications_created": created_notifications,
+            }
+        }
+
+
+@router.post("/messages")
+def seed_messages_data(user_id: str = "guest-user"):
+    """Seed des conversations et messages de démo pour un utilisateur spécifique."""
+    engine = get_engine()
+    
+    # Utiliser l'user_id fourni comme "moi" dans les conversations
+    my_id = user_id
+    
+    with Session(engine) as session:
+        # S'assurer que les utilisateurs de démo existent
+        demo_users = [
+            {"id": "demo-user-1", "username": "FitGirl_Marie", "bio": "Coach fitness 💪 Paris", "avatar_url": "https://i.pravatar.cc/150?u=marie"},
+            {"id": "demo-user-2", "username": "MuscleBro_Tom", "bio": "Powerlifter | Never skip leg day 🦵", "avatar_url": "https://i.pravatar.cc/150?u=tom"},
+            {"id": "demo-user-3", "username": "Coach_Alex", "bio": "Coach certifié | Spécialiste renfo", "avatar_url": "https://i.pravatar.cc/150?u=alex"},
+            {"id": "demo-user-4", "username": "Iron_Sophie", "bio": "CrossFit addict 🏋️‍♀️ Marseille", "avatar_url": "https://i.pravatar.cc/150?u=sophie"},
+            {"id": "demo-user-7", "username": "BigLift_Max", "bio": "Deadlift 250kg 🔥", "avatar_url": "https://i.pravatar.cc/150?u=max"},
+        ]
+        
+        for u in demo_users:
+            existing = session.get(User, u["id"])
+            if not existing:
+                user = User(
+                    id=u["id"],
+                    username=u["username"],
+                    email=f"{u['id']}@demo.local",
+                    password_hash="demo_hash",
+                    consent_to_public_share=True,
+                    bio=u.get("bio"),
+                    avatar_url=u.get("avatar_url"),
+                )
+                session.add(user)
+            else:
+                # Mettre à jour les infos existantes
+                existing.bio = u.get("bio")
+                existing.avatar_url = u.get("avatar_url")
+        
+        session.commit()
+        
+        # Conversations et messages de démo
+        conversations_data = [
+            {
+                "participant_id": "demo-user-1",
+                "messages": [
+                    {"sender": "demo-user-1", "content": "Salut ! J'ai vu ta séance d'hier, impressionnant ! 💪", "mins_ago": 45},
+                    {"sender": "ME", "content": "Merci ! J'essaie de progresser régulièrement", "mins_ago": 40},
+                    {"sender": "demo-user-1", "content": "Tu fais combien au développé couché maintenant ?", "mins_ago": 35},
+                    {"sender": "ME", "content": "Je suis à 80kg pour 8 reps, et toi ?", "mins_ago": 30},
+                    {"sender": "demo-user-1", "content": "Nice ! Moi 60kg mais je progresse 📈 On pourrait s'entraîner ensemble un de ces jours ?", "mins_ago": 25},
+                    {"sender": "ME", "content": "Carrément ! Tu vas à quelle salle ?", "mins_ago": 15},
+                    {"sender": "demo-user-1", "content": "Basic Fit République, toi ?", "mins_ago": 5},
+                ],
+            },
+            {
+                "participant_id": "demo-user-2",
+                "messages": [
+                    {"sender": "demo-user-2", "content": "Hey ! T'as essayé le programme 5x5 dont je t'ai parlé ?", "mins_ago": 180},
+                    {"sender": "ME", "content": "Pas encore, tu peux me l'envoyer ?", "mins_ago": 170},
+                    {"sender": "demo-user-2", "content": "C'est le StrongLifts 5x5, très efficace pour prendre de la force. Squat, Bench, Row, OHP et Deadlift 💀", "mins_ago": 160},
+                    {"sender": "ME", "content": "Ah oui j'en ai entendu parler ! 3 séances par semaine c'est ça ?", "mins_ago": 150},
+                    {"sender": "demo-user-2", "content": "Exactement. Tu ajoutes 2.5kg à chaque séance tant que tu réussis tes 5x5", "mins_ago": 140},
+                    {"sender": "demo-user-2", "content": "J'ai pris 30kg au squat en 3 mois avec ça 🔥", "mins_ago": 130},
+                ],
+            },
+            {
+                "participant_id": "demo-user-3",
+                "messages": [
+                    {"sender": "demo-user-3", "content": "Bonjour ! Je suis coach et j'ai remarqué ton profil. Tu cherches des conseils ?", "mins_ago": 1440},
+                    {"sender": "ME", "content": "Bonjour ! Oui pourquoi pas, j'aimerais optimiser mes entraînements", "mins_ago": 1400},
+                    {"sender": "demo-user-3", "content": "Tu fais quoi comme split actuellement ?", "mins_ago": 1350},
+                    {"sender": "ME", "content": "Push/Pull/Legs, 6 jours par semaine", "mins_ago": 1300},
+                    {"sender": "demo-user-3", "content": "C'est un bon programme ! Tu gères bien la récupération ? Sommeil, nutrition ?", "mins_ago": 1250},
+                    {"sender": "ME", "content": "Le sommeil c'est pas toujours ça... 6h en moyenne", "mins_ago": 1200},
+                    {"sender": "demo-user-3", "content": "Aïe ! 7-8h minimum pour optimiser la récup et la prise de muscle. C'est vraiment important 💤", "mins_ago": 1150},
+                ],
+            },
+            {
+                "participant_id": "demo-user-4",
+                "messages": [
+                    {"sender": "demo-user-4", "content": "Yo ! Tu viens au challenge CrossFit samedi ? 🏋️‍♀️", "mins_ago": 300},
+                    {"sender": "ME", "content": "Je savais pas qu'il y avait un challenge ! C'est où ?", "mins_ago": 280},
+                    {"sender": "demo-user-4", "content": "À la box CrossFit Nation, 14h. On fait un Murph modifié", "mins_ago": 260},
+                    {"sender": "demo-user-4", "content": "T'es chaud ?", "mins_ago": 255},
+                ],
+            },
+            {
+                "participant_id": "demo-user-7",
+                "messages": [
+                    {"sender": "demo-user-7", "content": "Bro, tu deadlift combien ? 💀", "mins_ago": 600},
+                    {"sender": "ME", "content": "140kg 1RM, et toi ?", "mins_ago": 580},
+                    {"sender": "demo-user-7", "content": "250kg 😤 Mais j'ai 5 ans d'expérience", "mins_ago": 560},
+                    {"sender": "ME", "content": "Wow c'est énorme ! Tu utilises quoi comme accessoires ?", "mins_ago": 540},
+                    {"sender": "demo-user-7", "content": "Ceinture de force, straps pour les gros max, et chalk évidemment", "mins_ago": 520},
+                    {"sender": "demo-user-7", "content": "Le plus important c'est la technique. Tu tires conventional ou sumo ?", "mins_ago": 510},
+                    {"sender": "ME", "content": "Conventional, le sumo je galère", "mins_ago": 490},
+                    {"sender": "demo-user-7", "content": "Teste le sumo, parfois ça matche mieux selon ta morphologie 👍", "mins_ago": 480},
+                ],
+            },
+        ]
+        
+        created_conversations = 0
+        created_messages = 0
+        
+        for conv_data in conversations_data:
+            # Vérifier si la conversation existe déjà
+            existing_conv = session.exec(
+                select(Conversation).where(
+                    ((Conversation.participant1_id == my_id) & 
+                     (Conversation.participant2_id == conv_data["participant_id"])) |
+                    ((Conversation.participant1_id == conv_data["participant_id"]) & 
+                     (Conversation.participant2_id == my_id))
+                )
+            ).first()
+            
+            if existing_conv:
+                # Supprimer les anciens messages pour rafraîchir
+                old_messages = session.exec(
+                    select(Message).where(Message.conversation_id == existing_conv.id)
+                ).all()
+                for old_msg in old_messages:
+                    session.delete(old_msg)
+                conversation = existing_conv
+            else:
+                # Créer nouvelle conversation
+                conversation = Conversation(
+                    participant1_id=my_id,
+                    participant2_id=conv_data["participant_id"],
+                )
+                session.add(conversation)
+                session.flush()
+                created_conversations += 1
+            
+            # Ajouter les messages
+            last_message_time = None
+            for msg_data in conv_data["messages"]:
+                msg_time = datetime.now(timezone.utc) - timedelta(minutes=msg_data["mins_ago"])
+                # Remplacer "ME" par l'ID de l'utilisateur actuel
+                actual_sender = my_id if msg_data["sender"] == "ME" else msg_data["sender"]
+                message = Message(
+                    conversation_id=conversation.id,
+                    sender_id=actual_sender,
+                    content=msg_data["content"],
+                    created_at=msg_time,
+                    read_at=msg_time if actual_sender == my_id else None,
+                )
+                session.add(message)
+                created_messages += 1
+                
+                if last_message_time is None or msg_time > last_message_time:
+                    last_message_time = msg_time
+            
+            # Mettre à jour le timestamp du dernier message
+            conversation.last_message_at = last_message_time
+        
+        session.commit()
+        
+        return {
+            "status": "success",
+            "message": "Messages de démo créés avec succès !",
+            "details": {
+                "conversations_created": created_conversations,
+                "messages_created": created_messages,
             }
         }
 

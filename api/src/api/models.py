@@ -195,3 +195,22 @@ class SyncEvent(SQLModel, table=True):
     entity_id: Optional[str] = Field(default=None)
     payload: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Conversation(SQLModel, table=True):
+    """Conversation privée entre deux utilisateurs."""
+    id: str = Field(default_factory=generate_uuid, primary_key=True)
+    participant1_id: str = Field(index=True)
+    participant2_id: str = Field(index=True)
+    last_message_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Message(SQLModel, table=True):
+    """Message dans une conversation."""
+    id: str = Field(default_factory=generate_uuid, primary_key=True)
+    conversation_id: str = Field(index=True)
+    sender_id: str = Field(index=True)
+    content: str
+    read_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)

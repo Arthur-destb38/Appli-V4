@@ -704,6 +704,18 @@ export default function HomeScreen() {
                 <Pressable
                   style={({ pressed }) => [
                     styles.drawerItem,
+                    { backgroundColor: pressed ? '#6366f115' : 'transparent' },
+                  ]}
+                  onPress={() => goTo('/messages')}
+                >
+                  <View style={[styles.drawerItemIcon, { backgroundColor: '#6366f120' }]}>
+                    <Ionicons name="chatbubbles-outline" size={20} color="#6366f1" />
+                  </View>
+                  <Text style={[styles.drawerItemText, { color: theme.colors.textPrimary }]}>Messages</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.drawerItem,
                     { backgroundColor: pressed ? theme.colors.surfaceMuted : 'transparent' },
                   ]}
                   onPress={() => goTo('/settings')}

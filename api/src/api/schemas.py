@@ -208,3 +208,60 @@ class MeResponse(BaseModel):
     consent_to_public_share: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# Messaging
+class MessageRead(BaseModel):
+    id: str
+    conversation_id: str
+    sender_id: str
+    content: str
+    read_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConversationParticipant(BaseModel):
+    id: str
+    username: str
+    avatar_url: Optional[str] = None
+
+
+class ConversationRead(BaseModel):
+    id: str
+    participant: ConversationParticipant
+    last_message: Optional[MessageRead] = None
+    unread_count: int = 0
+    last_message_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationRead]
+    next_cursor: Optional[str] = None
+
+
+class MessageListResponse(BaseModel):
+    messages: list[MessageRead]
+    next_cursor: Optional[str] = None
+
+
+class SendMessageRequest(BaseModel):
+    content: constr(min_length=1, max_length=2000)
+
+
+class SendMessageResponse(BaseModel):
+    message: MessageRead
+    conversation_id: str
+
+
+class CreateConversationRequest(BaseModel):
+    participant_id: str
+
+
+class CreateConversationResponse(BaseModel):
+    conversation: ConversationRead
+    created: bool  # True si nouvelle conversation, False si existante
