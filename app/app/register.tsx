@@ -20,6 +20,7 @@ export default function RegisterScreen() {
   const { register, isAuthenticated, isLoading } = useAuth();
   const { theme } = useAppTheme();
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +34,7 @@ export default function RegisterScreen() {
   }, [isAuthenticated, isLoading, router]);
 
   const handleRegister = async () => {
-    if (!username.trim() || !password.trim() || !confirmPassword.trim()) {
+    if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
@@ -43,8 +44,15 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+    // Validation email simple
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('Erreur', 'Veuillez entrer un email valide');
+      return;
+    }
+
+    if (password.length < 8) {
+      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 8 caractères');
       return;
     }
 
@@ -55,13 +63,13 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await register({ username: username.trim(), password });
+      await register({ username: username.trim(), email: email.trim(), password });
       console.log('Registration successful, waiting for redirect...');
       // La redirection se fera automatiquement via le useEffect ci-dessus
     } catch (error) {
       Alert.alert(
         'Erreur d\'inscription',
-        error instanceof Error ? error.message : 'Ce nom d\'utilisateur est déjà pris'
+        error instanceof Error ? error.message : 'Une erreur est survenue'
       );
     } finally {
       setLoading(false);
@@ -88,6 +96,21 @@ export default function RegisterScreen() {
               onChangeText={setUsername}
               placeholder="Choisis un nom d'utilisateur"
               placeholderTextColor={theme.colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>Email</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="ton@email.com"
+              placeholderTextColor={theme.colors.textSecondary}
+              keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               editable={!loading}

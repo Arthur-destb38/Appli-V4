@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/hooks/useAuth';
 
 const toTimeLabel = (date: Date) => {
   const hours = date.getHours().toString().padStart(2, '0');
@@ -73,6 +74,7 @@ const SettingsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { theme, mode, setMode } = useAppTheme();
   const { profile, updateProfile } = useUserProfile();
+  const { logout, user } = useAuth();
   const [notificationsOn, setNotificationsOn] = useState(false);
   const [usageMinutes] = useState(0);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -360,6 +362,43 @@ const SettingsScreen: React.FC = () => {
                   onPress={() => router.push('/legal/privacy')}
                   theme={theme}
                 />
+              </View>
+            </View>
+
+            {/* Section Compte */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>COMPTE</Text>
+              <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+                <SettingRow
+                  icon="person-circle"
+                  iconColor="#3b82f6"
+                  iconBg="#3b82f620"
+                  title="Utilisateur connecté"
+                  subtitle={user?.email || user?.username || 'Non connecté'}
+                  theme={theme}
+                />
+                <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+                <TouchableOpacity
+                  style={styles.settingRow}
+                  onPress={async () => {
+                    try {
+                      await logout();
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                    } catch (error) {
+                      console.error('Logout error:', error);
+                    }
+                  }}
+                >
+                  <View style={[styles.settingIcon, { backgroundColor: '#ef444420' }]}>
+                    <Ionicons name="log-out" size={20} color="#ef4444" />
+                  </View>
+                  <View style={styles.settingContent}>
+                    <Text style={[styles.settingTitle, { color: '#ef4444' }]}>Se déconnecter</Text>
+                    <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+                      Vous devrez vous reconnecter
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
 

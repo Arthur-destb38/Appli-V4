@@ -8,6 +8,7 @@ import { WorkoutsProvider } from '@/hooks/useWorkouts';
 import { UserProfileProvider } from '@/hooks/useUserProfile';
 import { AuthProvider } from '@/hooks/useAuth';
 import { AppThemeProvider } from '@/theme/ThemeProvider';
+import { AuthGuard } from '@/components/AuthGuard';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -16,81 +17,83 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AppThemeProvider>
         <AuthProvider>
-          <UserProfileProvider>
-            <WorkoutsProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="create"
-                  options={{ title: 'Nouvelle séance', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="track/[id]"
-                  options={{ title: 'Suivi séance', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="history/index"
-                  options={{ title: 'Historique', headerShown: false }}
-                />
-                <Stack.Screen
-                  name="history/[id]"
-                  options={{ title: 'Détail séance', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="history/progression"
-                  options={{ title: 'Progression', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="programme/create"
-                  options={{ title: 'Nouveau programme', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="programme/index"
-                  options={{ title: 'Mon Programme', headerShown: false }}
-                />
-                <Stack.Screen
-                  name="settings"
-                  options={{ title: 'Paramètres', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="legal/terms"
-                  options={{ title: 'Conditions d\'utilisation', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="legal/privacy"
-                  options={{ title: 'Politique de confidentialité', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="profile/[id]"
-                  options={{ title: 'Profil', headerShown: false }}
-                />
-                <Stack.Screen
-                  name="notifications"
-                  options={{ title: 'Notifications', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="leaderboard"
-                  options={{ title: 'Classement', headerShown: true, headerBackTitle: 'Retour' }}
-                />
-                <Stack.Screen
-                  name="challenge/[id]"
-                  options={{ title: 'Défi', headerShown: false }}
-                />
-                <Stack.Screen
-                  name="modal"
-                  options={{ presentation: 'modal', title: 'Modal' }}
-                />
-                <Stack.Screen
-                  name="login"
-                  options={{ title: 'Connexion', headerShown: false }}
-                />
-                <Stack.Screen
-                  name="register"
-                  options={{ title: 'Inscription', headerShown: false }}
-                />
-              </Stack>
-            </WorkoutsProvider>
-          </UserProfileProvider>
+          <AuthGuard>
+            <UserProfileProvider>
+              <WorkoutsProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="create"
+                    options={{ title: 'Nouvelle séance', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="track/[id]"
+                    options={{ title: 'Suivi séance', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="history/index"
+                    options={{ title: 'Historique', headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="history/[id]"
+                    options={{ title: 'Détail séance', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="history/progression"
+                    options={{ title: 'Progression', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="programme/create"
+                    options={{ title: 'Nouveau programme', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="programme/index"
+                    options={{ title: 'Mon Programme', headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="settings"
+                    options={{ title: 'Paramètres', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="legal/terms"
+                    options={{ title: 'Conditions d\'utilisation', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="legal/privacy"
+                    options={{ title: 'Politique de confidentialité', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="profile/[id]"
+                    options={{ title: 'Profil', headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="notifications"
+                    options={{ title: 'Notifications', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="leaderboard"
+                    options={{ title: 'Classement', headerShown: true, headerBackTitle: 'Retour' }}
+                  />
+                  <Stack.Screen
+                    name="challenge/[id]"
+                    options={{ title: 'Défi', headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="modal"
+                    options={{ presentation: 'modal', title: 'Modal' }}
+                  />
+                  <Stack.Screen
+                    name="login"
+                    options={{ title: 'Connexion', headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="register"
+                    options={{ title: 'Inscription', headerShown: false }}
+                  />
+                </Stack>
+              </WorkoutsProvider>
+            </UserProfileProvider>
+          </AuthGuard>
         </AuthProvider>
       </AppThemeProvider>
       <StatusBar style="auto" />

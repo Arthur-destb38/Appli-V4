@@ -18,13 +18,52 @@ const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
 export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
-  // AUTH DÉSACTIVÉE TEMPORAIREMENT
-  const [user, setUser] = useState<User | null>({ id: 'guest', username: 'Guest', created_at: new Date().toISOString(), consent_to_public_share: false });
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadTokens = useCallback(async () => {
-    // AUTH DÉSACTIVÉE - Ne rien faire
-    setIsLoading(false);
+    try {
+      setIsLoading(true);
+      
+      // Vérifier si on a des tokens stockés
+      const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+      const refreshTokenValue = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+      
+      if (accessToken && refreshTokenValue) {
+        try {
+          // Essayer de récupérer le profil avec l'access token
+          const userData = await getMe(accessToken);
+          setUser(userData);
+          console.log('✅ Utilisateur connecté automatiquement:', userData.username);
+        } catch (error) {
+          console.log('🔄 Access token expiré, tentative de refresh...');
+          try {
+            // Access token expiré, essayer le refresh
+            const tokens = await refreshToken(refreshTokenValue);
+            await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
+            await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
+            
+            const userData = await getMe(tokens.access_token);
+            setUser(userData);
+            console.log('✅ Tokens rafraîchis, utilisateur connecté:', userData.username);
+          } catch (refreshError) {
+            console.log('❌ Refresh token expiré, déconnexion');
+            // Refresh token aussi expiré, nettoyer
+            await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+            await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+            setUser(null);
+          }
+        }
+      } else {
+        console.log('ℹ️ Aucun token trouvé, utilisateur non connecté');
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors du chargement des tokens:', error);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -32,18 +71,74 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   }, [loadTokens]);
 
   const handleLogin = useCallback(async (credentials: LoginRequest) => {
-    // AUTH DÉSACTIVÉE - Simuler une connexion réussie
-    setUser({ id: 'guest', username: 'Guest', created_at: new Date().toISOString(), consent_to_public_share: false });
+    try {
+      setIsLoading(true);
+      const tokens = await login(credentials);
+      
+      // Stocker les tokens de manière sécurisée
+      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
+      
+      // Récupérer le profil utilisateur
+      const userData = await getMe(tokens.access_token);
+      setUser(userData);
+      
+      console.log('✅ Connexion réussie:', userData.username);
+    } catch (error) {
+      console.error('❌ Erreur de connexion:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const handleRegister = useCallback(async (credentials: RegisterRequest) => {
-    // AUTH DÉSACTIVÉE - Simuler une inscription réussie
-    setUser({ id: 'guest', username: 'Guest', created_at: new Date().toISOString(), consent_to_public_share: false });
+    try {
+      setIsLoading(true);
+      const tokens = await register(credentials);
+      
+      // Stocker les tokens de manière sécurisée
+      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
+      
+      // Récupérer le profil utilisateur
+      const userData = await getMe(tokens.access_token);
+      setUser(userData);
+      
+      console.log('✅ Inscription réussie:', userData.username);
+    } catch (error) {
+      console.error('❌ Erreur d\'inscription:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const handleLogout = useCallback(async () => {
-    // AUTH DÉSACTIVÉE - Ne rien faire
-    setUser({ id: 'guest', username: 'Guest', created_at: new Date().toISOString(), consent_to_public_share: false });
+    try {
+      setIsLoading(true);
+      
+      // Récupérer le refresh token pour le logout côté serveur
+      const refreshTokenValue = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+      if (refreshTokenValue) {
+        try {
+          await logoutApi(refreshTokenValue);
+        } catch (error) {
+          console.log('⚠️ Erreur logout serveur (pas grave):', error);
+        }
+      }
+      
+      // Nettoyer les tokens locaux
+      await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+      
+      setUser(null);
+      console.log('✅ Déconnexion réussie');
+    } catch (error) {
+      console.error('❌ Erreur de déconnexion:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const handleRefresh = useCallback(async () => {
@@ -63,7 +158,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       value={{
         user,
         isLoading,
-        isAuthenticated: true, // AUTH DÉSACTIVÉE - Toujours authentifié
+        isAuthenticated: !!user, // Authentifié si user existe
         login: handleLogin,
         register: handleRegister,
         logout: handleLogout,

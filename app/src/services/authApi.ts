@@ -7,6 +7,7 @@ export interface LoginRequest {
 
 export interface RegisterRequest {
   username: string;
+  email: string;
   password: string;
 }
 
@@ -19,8 +20,10 @@ export interface TokenPair {
 export interface User {
   id: string;
   username: string;
+  email: string;
   created_at: string;
   consent_to_public_share: boolean;
+  email_verified?: boolean;
 }
 
 export const login = async (payload: LoginRequest): Promise<TokenPair> => {
@@ -39,7 +42,7 @@ export const login = async (payload: LoginRequest): Promise<TokenPair> => {
 };
 
 export const register = async (payload: RegisterRequest): Promise<TokenPair> => {
-  const response = await fetch(buildApiUrl('/auth/register'), {
+  const response = await fetch(buildApiUrl('/auth/register-v2'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
