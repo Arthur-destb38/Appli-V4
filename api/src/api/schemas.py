@@ -381,15 +381,6 @@ class TokenPair(BaseModel):
     token_type: str = "bearer"
 
 
-class MeResponse(BaseModel):
-    id: str
-    username: str
-    created_at: datetime
-    consent_to_public_share: bool
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # Messaging
 class MessageRead(BaseModel):
     id: str

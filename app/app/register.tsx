@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,27 +11,17 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { AppButton } from '@/components/AppButton';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, isAuthenticated, isLoading } = useAuth();
   const { theme } = useAppTheme();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Redirection automatique si déjà authentifié
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      console.log('User already authenticated, redirecting to home...');
-      router.replace('/');
-    }
-  }, [isAuthenticated, isLoading, router]);
 
   const handleRegister = async () => {
     if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
@@ -63,10 +53,32 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await register({ username: username.trim(), email: email.trim(), password });
-      console.log('Registration successful, waiting for redirect...');
-      // La redirection se fera automatiquement via le useEffect ci-dessus
+      console.log('=== INSCRIPTION SIMPLIFIÉE ===');
+      
+      // Appel direct à l'API sans passer par le hook useAuth
+      const response = await fetch('http://172.20.10.2:8000/auth/register-v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: username.trim(), 
+          email: email.trim(), 
+          password 
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Erreur d\'inscription');
+      }
+      
+      const data = await response.json();
+      console.log('✅ Inscription réussie');
+      
+      // Redirection vers la configuration du profil (version simple)
+      router.push('/profile-setup-simple');
+      
     } catch (error) {
+      console.error('❌ Erreur d\'inscription:', error);
       Alert.alert(
         'Erreur d\'inscription',
         error instanceof Error ? error.message : 'Une erreur est survenue'

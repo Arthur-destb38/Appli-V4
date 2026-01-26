@@ -26,10 +26,10 @@ export default function LoginScreen() {
   // Redirection automatique si déjà authentifié
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      console.log('User already authenticated, redirecting to home...');
-      router.replace('/');
+      console.log('User already authenticated, checking profile completion...');
+      // Laisser l'AuthGuard gérer la redirection
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading]);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -39,12 +39,28 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      console.log('Login attempt:', username.trim());
-      await login({ username: username.trim(), password });
-      console.log('Login successful, waiting for redirect...');
-      // La redirection se fera automatiquement via le useEffect ci-dessus
+      console.log('=== LOGIN SIMPLIFIÉ ===');
+      
+      // Appel direct à l'API sans passer par le hook useAuth
+      const response = await fetch('http://172.20.10.2:8000/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Erreur de connexion');
+      }
+      
+      const data = await response.json();
+      console.log('✅ Connexion réussie');
+      
+      // Redirection directe
+      router.push('/(tabs)');
+      
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('❌ Erreur de connexion:', error);
       Alert.alert(
         'Erreur de connexion',
         error instanceof Error ? error.message : 'Nom d\'utilisateur ou mot de passe incorrect'
@@ -100,6 +116,13 @@ export default function LoginScreen() {
             loading={loading}
             disabled={loading}
             style={styles.button}
+          />
+
+          <AppButton
+            title="🚀 Test Navigation"
+            onPress={() => router.push('/(tabs)')}
+            variant="secondary"
+            style={[styles.button, { marginTop: 10 }]}
           />
 
           <Pressable

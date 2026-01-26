@@ -73,20 +73,32 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
 
   const handleLogin = useCallback(async (credentials: LoginRequest) => {
     try {
-      setIsLoading(true);
-      const tokens = await login(credentials);
+      console.log('=== DEBUT useAuth.handleLogin ===');
+      console.log('Credentials:', { username: credentials.username, password: '***' });
       
-      // Stocker les tokens de manière sécurisée
+      setIsLoading(true);
+      
+      console.log('1. Appel du service login...');
+      const tokens = await login(credentials);
+      console.log('✅ Tokens reçus');
+      
+      console.log('2. Stockage des tokens...');
       await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
       await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
+      console.log('✅ Tokens stockés');
       
-      // Récupérer le profil utilisateur
+      console.log('3. Récupération du profil utilisateur...');
       const userData = await getMe(tokens.access_token);
-      setUser(userData);
+      console.log('✅ Profil récupéré:', userData);
       
-      console.log('✅ Connexion réussie:', userData.username);
+      console.log('4. Mise à jour de l\'état...');
+      setUser(userData);
+      console.log('✅ État mis à jour');
+      
+      console.log('=== FIN useAuth.handleLogin ===');
     } catch (error) {
-      console.error('❌ Erreur de connexion:', error);
+      console.error('❌ Erreur useAuth.handleLogin:', error);
+      console.error('Stack trace:', error.stack);
       throw error;
     } finally {
       setIsLoading(false);
