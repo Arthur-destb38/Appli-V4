@@ -1,9 +1,37 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, PropsWithChildren } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import { login, register, refreshToken, getMe, logout as logoutApi, type LoginRequest, type RegisterRequest, type User } from '@/services/authApi';
+import React, { createContext, useContext, useState, useCallback, useEffect, PropsWithChildren } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { buildApiUrl } from '@/utils/api';
+
+interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+}
+
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  created_at?: string;
+  consent_to_public_share?: boolean;
+  profile_completed?: boolean;
+  email_verified?: boolean;
+}
+
+interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
 
 interface AuthContextValue {
   user: User | null;
+  tokens: AuthTokens | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
@@ -15,90 +43,117 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const ACCESS_TOKEN_KEY = 'access_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
+const STORAGE_KEYS = {
+  ACCESS_TOKEN: '@gorillax_access_token',
+  REFRESH_TOKEN: '@gorillax_refresh_token',
+  USER: '@gorillax_user',
+};
 
 export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [tokens, setTokens] = useState<AuthTokens | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadTokens = useCallback(async () => {
+  // Charger les données sauvegardées au démarrage
+  useEffect(() => {
+    loadStoredAuth();
+  }, []);
+
+  const loadStoredAuth = async () => {
     try {
-      setIsLoading(true);
-      
-      // Vérifier si on a des tokens stockés
-      const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-      const refreshTokenValue = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-      
-      if (accessToken && refreshTokenValue) {
-        try {
-          // Essayer de récupérer le profil avec l'access token
-          const userData = await getMe(accessToken);
-          setUser(userData);
-          console.log('✅ Utilisateur connecté automatiquement:', userData.username);
-        } catch (error) {
-          console.log('🔄 Access token expiré, tentative de refresh...');
-          try {
-            // Access token expiré, essayer le refresh
-            const tokens = await refreshToken(refreshTokenValue);
-            await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
-            await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
-            
-            const userData = await getMe(tokens.access_token);
-            setUser(userData);
-            console.log('✅ Tokens rafraîchis, utilisateur connecté:', userData.username);
-          } catch (refreshError) {
-            console.log('❌ Refresh token expiré, déconnexion');
-            // Refresh token aussi expiré, nettoyer
-            await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
-            await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-            setUser(null);
-          }
-        }
-      } else {
-        console.log('ℹ️ Aucun token trouvé, utilisateur non connecté');
-        setUser(null);
+      const [storedAccessToken, storedRefreshToken, storedUser] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
+        AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
+        AsyncStorage.getItem(STORAGE_KEYS.USER),
+      ]);
+
+      if (storedAccessToken && storedRefreshToken && storedUser) {
+        setTokens({
+          access_token: storedAccessToken,
+          refresh_token: storedRefreshToken,
+          token_type: 'bearer',
+        });
+        setUser(JSON.parse(storedUser));
+        console.log('✅ Session restaurée depuis le stockage');
       }
     } catch (error) {
-      console.error('❌ Erreur lors du chargement des tokens:', error);
-      setUser(null);
+      console.error('❌ Erreur lors du chargement de la session:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    loadTokens();
-  }, [loadTokens]);
+  const saveAuth = async (authTokens: AuthTokens, userData: User) => {
+    try {
+      await Promise.all([
+        AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, authTokens.access_token),
+        AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, authTokens.refresh_token),
+        AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData)),
+      ]);
+      setTokens(authTokens);
+      setUser(userData);
+      console.log('✅ Session sauvegardée');
+    } catch (error) {
+      console.error('❌ Erreur lors de la sauvegarde:', error);
+    }
+  };
+
+  const clearAuth = async () => {
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN),
+        AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
+        AsyncStorage.removeItem(STORAGE_KEYS.USER),
+      ]);
+      setTokens(null);
+      setUser(null);
+      console.log('✅ Session effacée');
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'effacement:', error);
+    }
+  };
+
+  const fetchUserProfile = async (accessToken: string): Promise<User> => {
+    const response = await fetch(buildApiUrl('/auth/me'), {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Impossible de récupérer le profil utilisateur');
+    }
+
+    return await response.json();
+  };
 
   const handleLogin = useCallback(async (credentials: LoginRequest) => {
+    setIsLoading(true);
     try {
-      console.log('=== DEBUT useAuth.handleLogin ===');
-      console.log('Credentials:', { username: credentials.username, password: '***' });
-      
-      setIsLoading(true);
-      
-      console.log('1. Appel du service login...');
-      const tokens = await login(credentials);
+      console.log('🔐 Connexion en cours...');
+      const response = await fetch(buildApiUrl('/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Erreur de connexion' }));
+        throw new Error(error.detail || 'Nom d\'utilisateur ou mot de passe incorrect');
+      }
+
+      const authTokens: AuthTokens = await response.json();
       console.log('✅ Tokens reçus');
+
+      // Récupérer le profil utilisateur
+      const userData = await fetchUserProfile(authTokens.access_token);
+      console.log('✅ Profil utilisateur récupéré');
+
+      await saveAuth(authTokens, userData);
       
-      console.log('2. Stockage des tokens...');
-      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
-      console.log('✅ Tokens stockés');
-      
-      console.log('3. Récupération du profil utilisateur...');
-      const userData = await getMe(tokens.access_token);
-      console.log('✅ Profil récupéré:', userData);
-      
-      console.log('4. Mise à jour de l\'état...');
-      setUser(userData);
-      console.log('✅ État mis à jour');
-      
-      console.log('=== FIN useAuth.handleLogin ===');
     } catch (error) {
-      console.error('❌ Erreur useAuth.handleLogin:', error);
-      console.error('Stack trace:', error.stack);
+      console.error('❌ Erreur login:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -106,21 +161,31 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   }, []);
 
   const handleRegister = useCallback(async (credentials: RegisterRequest) => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const tokens = await register(credentials);
-      
-      // Stocker les tokens de manière sécurisée
-      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
-      
+      console.log('📝 Inscription en cours...');
+      const response = await fetch(buildApiUrl('/auth/register-v2'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Erreur d\'inscription' }));
+        throw new Error(error.detail || 'Erreur lors de l\'inscription');
+      }
+
+      const authTokens: AuthTokens = await response.json();
+      console.log('✅ Inscription réussie, tokens reçus');
+
       // Récupérer le profil utilisateur
-      const userData = await getMe(tokens.access_token);
-      setUser(userData);
+      const userData = await fetchUserProfile(authTokens.access_token);
+      console.log('✅ Profil utilisateur récupéré');
+
+      await saveAuth(authTokens, userData);
       
-      console.log('✅ Inscription réussie:', userData.username);
     } catch (error) {
-      console.error('❌ Erreur d\'inscription:', error);
+      console.error('❌ Erreur register:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -128,67 +193,88 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   }, []);
 
   const handleLogout = useCallback(async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
-      // Récupérer le refresh token pour le logout côté serveur
-      const refreshTokenValue = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-      if (refreshTokenValue) {
-        try {
-          await logoutApi(refreshTokenValue);
-        } catch (error) {
-          console.log('⚠️ Erreur logout serveur (pas grave):', error);
-        }
+      // Appeler l'endpoint de déconnexion si on a un token
+      if (tokens?.access_token) {
+        await fetch(buildApiUrl('/auth/logout'), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokens.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }).catch(() => {
+          // Ignorer les erreurs de déconnexion côté serveur
+          console.log('⚠️ Erreur lors de la déconnexion côté serveur (ignorée)');
+        });
       }
-      
-      // Nettoyer les tokens locaux
-      await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
-      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-      
-      setUser(null);
+
+      await clearAuth();
       console.log('✅ Déconnexion réussie');
     } catch (error) {
-      console.error('❌ Erreur de déconnexion:', error);
+      console.error('❌ Erreur logout:', error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [tokens]);
 
   const handleRefresh = useCallback(async () => {
-    const refreshTokenValue = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-    if (!refreshTokenValue) {
-      throw new Error('No refresh token available');
+    if (!tokens?.refresh_token) {
+      throw new Error('Aucun token de rafraîchissement disponible');
     }
-    const tokens = await refreshToken(refreshTokenValue);
-    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
-    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
-    const userData = await getMe(tokens.access_token);
-    setUser(userData);
-  }, []);
 
-  const handleUpdateProfile = useCallback(async () => {
     try {
-      const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-      if (!accessToken) {
-        throw new Error('No access token available');
+      const response = await fetch(buildApiUrl('/auth/refresh'), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokens.refresh_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Impossible de rafraîchir le token');
+      }
+
+      const newTokens: AuthTokens = await response.json();
+      
+      // Garder l'utilisateur actuel, juste mettre à jour les tokens
+      if (user) {
+        await saveAuth(newTokens, user);
       }
       
-      // Récupérer le profil mis à jour
-      const userData = await getMe(accessToken);
-      setUser(userData);
-      console.log('✅ Profil mis à jour:', userData.username);
+      console.log('✅ Tokens rafraîchis');
     } catch (error) {
-      console.error('❌ Erreur mise à jour profil:', error);
+      console.error('❌ Erreur refresh:', error);
+      // Si le refresh échoue, déconnecter l'utilisateur
+      await clearAuth();
       throw error;
     }
-  }, []);
+  }, [tokens, user]);
+
+  const handleUpdateProfile = useCallback(async () => {
+    if (!tokens?.access_token) {
+      throw new Error('Non authentifié');
+    }
+
+    try {
+      const userData = await fetchUserProfile(tokens.access_token);
+      setUser(userData);
+      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      console.log('✅ Profil mis à jour');
+    } catch (error) {
+      console.error('❌ Erreur update profile:', error);
+      throw error;
+    }
+  }, [tokens]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        tokens,
         isLoading,
-        isAuthenticated: !!user, // Authentifié si user existe
+        isAuthenticated: !!user && !!tokens,
         login: handleLogin,
         register: handleRegister,
         logout: handleLogout,

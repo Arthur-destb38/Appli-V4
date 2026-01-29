@@ -9,24 +9,56 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { theme } = useAppTheme();
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  // Attendre que le composant soit monté
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   React.useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !isMounted) return;
 
     const isAuthScreen = pathname === '/login' || pathname === '/register';
+    const isProfileSetupScreen = pathname === '/profile-setup' || pathname === '/profile-setup-simple';
 
-    // Si pas connecté et pas sur écran d'auth -> login
+    console.log('AuthGuard:', { isAuthenticated, pathname, userProfileCompleted: user?.profile_completed });
+
+    // Utiliser setTimeout pour éviter les erreurs de navigation
+    const navigate = (path: string) => {
+      setTimeout(() => {
+        router.replace(path as any);
+      }, 50);
+    };
+
     if (!isAuthenticated && !isAuthScreen) {
-      console.log('AuthGuard: Redirection vers login');
-      router.replace('/login');
+      // Pas connecté et pas sur écran d'auth -> login
+      console.log('Redirection vers login');
+      navigate('/login');
+    } else if (isAuthenticated && isAuthScreen) {
+      // Connecté et sur écran d'auth -> vérifier profil
+      if (user && user.profile_completed === false) {
+        console.log('Redirection vers profile-setup');
+        navigate('/profile-setup');
+      } else {
+        console.log('Redirection vers app');
+        navigate('/(tabs)');
+      }
+    } else if (isAuthenticated && user && user.profile_completed === false && !isProfileSetupScreen) {
+      // Connecté mais profil incomplet -> setup
+      console.log('Redirection vers profile-setup (profil incomplet)');
+      navigate('/profile-setup');
     }
-  }, [isAuthenticated, isLoading, pathname, router]);
+  }, [isAuthenticated, isLoading, user, pathname, router, isMounted]);
 
-  if (isLoading) {
+  if (isLoading || !isMounted) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.accent} />

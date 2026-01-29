@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -94,18 +93,14 @@ export default function ProfileSetupScreen() {
       console.log('=== COMPLETION PROFIL ===');
       console.log('Données du profil:', profileData);
       
-      // Pour l'instant, on simule juste la sauvegarde et on redirige
-      // TODO: Implémenter l'appel API quand l'auth sera fixée
-      
-      Alert.alert(
-        'Profil complété ! 🎉',
-        'Votre profil a été configuré avec succès.',
-        [{ text: 'Continuer', onPress: () => router.replace('/(tabs)') }]
-      );
+      // Pour l'instant, on simule la sauvegarde et on redirige directement
+      // L'API backend sera connectée plus tard
+      console.log('✅ Profil complété - redirection vers app');
+      router.replace('/(tabs)');
       
     } catch (error) {
       console.error('Erreur completion profil:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder le profil');
+      console.log('❌ Impossible de sauvegarder le profil');
     } finally {
       setLoading(false);
     }
@@ -392,18 +387,16 @@ export default function ProfileSetupScreen() {
               </Text>
             </TouchableOpacity>
             
-            {/* Bouton de test pour debug */}
+            {/* Bouton de test pour la dernière étape */}
             {currentStep === totalSteps && (
               <TouchableOpacity
-                style={[styles.nextButton, { backgroundColor: '#ff6b6b', marginTop: 10, flex: 1 }]}
+                style={[styles.nextButton, { backgroundColor: '#28a745', marginTop: 10, flex: 1 }]}
                 onPress={() => {
-                  console.log('🧪 Test bouton cliqué');
-                  Alert.alert('Test', 'Bouton de test fonctionne !', [
-                    { text: 'Aller à l\'app', onPress: () => router.replace('/(tabs)') }
-                  ]);
+                  console.log('🧪 Test Terminer cliqué - redirection directe');
+                  router.replace('/(tabs)');
                 }}
               >
-                <Text style={styles.nextButtonText}>🧪 Test - Aller à l'app</Text>
+                <Text style={styles.nextButtonText}>🧪 Test Terminer</Text>
               </TouchableOpacity>
             )}
           </View>

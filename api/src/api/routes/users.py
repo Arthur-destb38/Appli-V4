@@ -50,7 +50,7 @@ def upsert_profile(
 def get_profile_status(
     current_user: User = Depends(_get_current_user)
 ) -> dict:
-    """Vérifier le statut de completion du profil"""
+    """Vérifier le statut de completion du profil et retourner toutes les données"""
     
     # Calculer le pourcentage de completion
     total_fields = 10  # Nombre de champs importants
@@ -60,33 +60,50 @@ def get_profile_status(
         completed_fields += 1
     if current_user.bio:
         completed_fields += 1
-    if getattr(current_user, 'location', None):
+    if current_user.location:
         completed_fields += 1
-    if getattr(current_user, 'height', None):
+    if current_user.height:
         completed_fields += 1
-    if getattr(current_user, 'weight', None):
+    if current_user.weight:
         completed_fields += 1
-    if getattr(current_user, 'birth_date', None):
+    if current_user.birth_date:
         completed_fields += 1
-    if getattr(current_user, 'gender', None):
+    if current_user.gender:
         completed_fields += 1
     if current_user.objective:
         completed_fields += 1
-    if getattr(current_user, 'experience_level', None):
+    if current_user.experience_level:
         completed_fields += 1
-    if getattr(current_user, 'training_frequency', None):
+    if current_user.training_frequency:
         completed_fields += 1
     
     completion_percentage = int((completed_fields / total_fields) * 100)
-    profile_completed = getattr(current_user, 'profile_completed', False) or False
+    profile_completed = current_user.profile_completed or False
     
+    # Retourner toutes les données du profil
     return {
         "profile_completed": profile_completed,
         "completion_percentage": completion_percentage,
         "completed_fields": completed_fields,
         "total_fields": total_fields,
         "user_id": current_user.id,
-        "username": current_user.username
+        "username": current_user.username,
+        # Données de base
+        "bio": current_user.bio,
+        "objective": current_user.objective,
+        "avatar_url": current_user.avatar_url,
+        # Données personnelles
+        "location": current_user.location,
+        "height": current_user.height,
+        "weight": current_user.weight,
+        "birth_date": current_user.birth_date.isoformat() if current_user.birth_date else None,
+        "gender": current_user.gender,
+        # Objectifs fitness
+        "experience_level": current_user.experience_level,
+        "training_frequency": current_user.training_frequency,
+        "equipment_available": current_user.equipment_available,
+        # Préférences
+        "consent_to_public_share": current_user.consent_to_public_share
     }
 
 
@@ -236,34 +253,40 @@ def complete_profile_all_steps(
     if 'bio' in payload and payload['bio']:
         current_user.bio = payload['bio']
     if 'location' in payload and payload['location']:
-        setattr(current_user, 'location', payload['location'])
+        current_user.location = payload['location']
     if 'height' in payload and payload['height']:
-        setattr(current_user, 'height', int(payload['height']))
+        current_user.height = int(payload['height'])
     if 'weight' in payload and payload['weight']:
-        setattr(current_user, 'weight', float(payload['weight']))
+        current_user.weight = float(payload['weight'])
     if 'birth_date' in payload and payload['birth_date']:
-        setattr(current_user, 'birth_date', datetime.fromisoformat(payload['birth_date'].replace('Z', '+00:00')))
+        current_user.birth_date = datetime.fromisoformat(payload['birth_date'].replace('Z', '+00:00'))
     if 'gender' in payload and payload['gender']:
-        setattr(current_user, 'gender', payload['gender'])
+        current_user.gender = payload['gender']
     
     # Étape 2: Objectifs fitness
     if 'objective' in payload and payload['objective']:
         current_user.objective = payload['objective']
     if 'experience_level' in payload and payload['experience_level']:
-        setattr(current_user, 'experience_level', payload['experience_level'])
+        current_user.experience_level = payload['experience_level']
     if 'training_frequency' in payload and payload['training_frequency']:
-        setattr(current_user, 'training_frequency', int(payload['training_frequency']))
+        current_user.training_frequency = int(payload['training_frequency'])
     
     # Étape 3: Préférences
     if 'equipment_available' in payload and payload['equipment_available']:
-        import json
-        setattr(current_user, 'equipment_available', json.dumps(payload['equipment_available']))
+        # Si c'est déjà une string JSON, l'utiliser directement
+        if isinstance(payload['equipment_available'], str):
+            current_user.equipment_available = payload['equipment_available']
+        else:
+            # Sinon, convertir en JSON
+            import json
+            current_user.equipment_available = json.dumps(payload['equipment_available'])
     
     if 'consent_to_public_share' in payload:
         current_user.consent_to_public_share = payload['consent_to_public_share']
     
-    setattr(current_user, 'profile_completed', True)
+    current_user.profile_completed = True
     
+    session.add(current_user)
     session.commit()
     session.refresh(current_user)
     

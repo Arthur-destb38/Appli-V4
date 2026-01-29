@@ -92,6 +92,10 @@ export default function RootLayout() {
                   name="profile-setup"
                   options={{ title: 'Configuration du profil', headerShown: false }}
                 />
+                <Stack.Screen
+                  name="profile-setup-simple"
+                  options={{ title: 'Configuration du profil', headerShown: false }}
+                />
               </Stack>
             </WorkoutsProvider>
           </UserProfileProvider>

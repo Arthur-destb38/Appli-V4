@@ -8,6 +8,7 @@ from typing import Optional
 
 from ..db import get_session
 from ..models import User, Share, Follower, Like, Notification
+from ..routes.auth import _get_current_user  # ✅ AJOUTÉ: Import de la fonction d'authentification
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 
@@ -105,13 +106,16 @@ def get_profile(
 def update_profile(
     user_id: str,
     payload: ProfileUpdateRequest,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_user)  # ✅ AJOUTÉ: Authentification requise
 ) -> ProfileResponse:
     """Mettre à jour son profil."""
     
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="user_not_found")
+    # ✅ AJOUTÉ: Vérification que l'utilisateur ne peut modifier que son propre profil
+    if current_user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="can_only_update_own_profile")
+    
+    user = current_user  # ✅ MODIFIÉ: Utiliser l'utilisateur authentifié
     
     # Mettre à jour les champs fournis
     if payload.avatar_url is not None:
@@ -175,18 +179,19 @@ def get_user_posts(
 @router.post("/{user_id}/follow", status_code=status.HTTP_204_NO_CONTENT)
 def follow_user(
     user_id: str,
-    follower_id: str,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_user)  # ✅ AJOUTÉ: Authentification requise
 ):
     """Suivre un utilisateur."""
+    
+    follower_id = current_user.id  # ✅ MODIFIÉ: Utiliser l'utilisateur authentifié
     
     if follower_id == user_id:
         raise HTTPException(status_code=400, detail="cannot_follow_self")
     
-    # Vérifier que les deux utilisateurs existent
+    # Vérifier que l'utilisateur à suivre existe
     user = session.get(User, user_id)
-    follower = session.get(User, follower_id)
-    if not user or not follower:
+    if not user:
         raise HTTPException(status_code=404, detail="user_not_found")
     
     # Vérifier si déjà suivi
@@ -206,7 +211,7 @@ def follow_user(
             user_id=user_id,
             type="follow",
             actor_id=follower_id,
-            actor_username=follower.username,
+            actor_username=current_user.username,  # ✅ MODIFIÉ: Utiliser l'utilisateur authentifié
             reference_id=None,
             message=f"{follower.username} a commencé à te suivre",
         )
@@ -217,10 +222,12 @@ def follow_user(
 @router.delete("/{user_id}/follow", status_code=status.HTTP_204_NO_CONTENT)
 def unfollow_user(
     user_id: str,
-    follower_id: str,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_user)  # ✅ AJOUTÉ: Authentification requise
 ):
     """Ne plus suivre un utilisateur."""
+    
+    follower_id = current_user.id  # ✅ MODIFIÉ: Utiliser l'utilisateur authentifié
     
     existing = session.exec(
         select(Follower)
@@ -304,13 +311,16 @@ class AvatarUploadResponse(BaseModel):
 def upload_avatar(
     user_id: str,
     payload: AvatarUploadRequest,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_user)  # ✅ AJOUTÉ: Authentification requise
 ) -> AvatarUploadResponse:
     """Upload un avatar pour un utilisateur (stocké en base64)."""
     
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="user_not_found")
+    # ✅ AJOUTÉ: Vérification que l'utilisateur ne peut modifier que son propre avatar
+    if current_user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="can_only_update_own_avatar")
+    
+    user = current_user  # ✅ MODIFIÉ: Utiliser l'utilisateur authentifié
     
     # Valider et nettoyer le base64
     image_data = payload.image_base64

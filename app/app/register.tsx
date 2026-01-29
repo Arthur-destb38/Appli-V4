@@ -3,88 +3,91 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
+  TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/theme/ThemeProvider';
-import { AppButton } from '@/components/AppButton';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { register, isLoading } = useAuth();
   const { theme } = useAppTheme();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleRegister = async () => {
+  const validateForm = () => {
     if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
-      return;
+      setError('Veuillez remplir tous les champs');
+      return false;
     }
 
     if (username.trim().length < 3) {
-      Alert.alert('Erreur', 'Le nom d\'utilisateur doit contenir au moins 3 caractères');
-      return;
+      setError('Le nom d\'utilisateur doit contenir au moins 3 caractères');
+      return false;
     }
 
-    // Validation email simple
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('Erreur', 'Veuillez entrer un email valide');
-      return;
+      setError('Veuillez entrer une adresse email valide');
+      return false;
     }
 
     if (password.length < 8) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 8 caractères');
-      return;
+      setError('Le mot de passe doit contenir au moins 8 caractères');
+      return false;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+      setError('Les mots de passe ne correspondent pas');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleRegister = async () => {
+    if (!validateForm()) {
       return;
     }
 
-    setLoading(true);
+    setError('');
     try {
-      console.log('=== INSCRIPTION SIMPLIFIÉE ===');
-      
-      // Appel direct à l'API sans passer par le hook useAuth
-      const response = await fetch('http://172.20.10.2:8000/auth/register-v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          username: username.trim(), 
-          email: email.trim(), 
-          password 
-        })
+      await register({
+        username: username.trim(),
+        email: email.trim(),
+        password: password,
       });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Erreur d\'inscription');
-      }
-      
-      const data = await response.json();
-      console.log('✅ Inscription réussie');
-      
-      // Redirection vers la configuration du profil (version simple)
-      router.push('/profile-setup-simple');
-      
+      console.log('✅ Inscription réussie, redirection vers profil...');
+      router.replace('/profile-setup-simple');
     } catch (error) {
       console.error('❌ Erreur d\'inscription:', error);
-      Alert.alert(
-        'Erreur d\'inscription',
-        error instanceof Error ? error.message : 'Une erreur est survenue'
-      );
-    } finally {
-      setLoading(false);
+      setError(error instanceof Error ? error.message : 'Erreur lors de l\'inscription');
+    }
+  };
+
+  const handleQuickRegister = async () => {
+    setError('');
+    try {
+      const timestamp = Date.now();
+      await register({
+        username: `user${timestamp}`,
+        email: `test${timestamp}@example.com`,
+        password: 'TestPassword123',
+      });
+      console.log('✅ Inscription rapide réussie');
+      router.replace('/profile-setup-simple');
+    } catch (error) {
+      console.error('❌ Erreur inscription rapide:', error);
+      setError('Erreur lors de l\'inscription rapide');
     }
   };
 
@@ -96,28 +99,54 @@ export default function RegisterScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.colors.textPrimary }]}>🦍 Gorillax</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Crée ton compte</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+            Crée ton compte
+          </Text>
         </View>
 
         <View style={styles.form}>
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.inputContainer}>
-            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>Nom d'utilisateur</Text>
+            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
+              Nom d'utilisateur
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.textPrimary,
+                  borderColor: theme.colors.border,
+                },
+              ]}
               value={username}
               onChangeText={setUsername}
               placeholder="Choisis un nom d'utilisateur"
               placeholderTextColor={theme.colors.textSecondary}
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!loading}
+              editable={!isLoading}
             />
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>Email</Text>
+            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
+              Email
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.textPrimary,
+                  borderColor: theme.colors.border,
+                },
+              ]}
               value={email}
               onChangeText={setEmail}
               placeholder="ton@email.com"
@@ -125,55 +154,85 @@ export default function RegisterScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!loading}
+              editable={!isLoading}
             />
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>Mot de passe</Text>
+            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
+              Mot de passe
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.textPrimary,
+                  borderColor: theme.colors.border,
+                },
+              ]}
               value={password}
               onChangeText={setPassword}
-              placeholder="Au moins 6 caractères"
+              placeholder="Au moins 8 caractères"
               placeholderTextColor={theme.colors.textSecondary}
               secureTextEntry
               autoCapitalize="none"
-              editable={!loading}
+              editable={!isLoading}
             />
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>Confirmer le mot de passe</Text>
+            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
+              Confirmer le mot de passe
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.textPrimary,
+                  borderColor: theme.colors.border,
+                },
+              ]}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               placeholder="Répète ton mot de passe"
               placeholderTextColor={theme.colors.textSecondary}
               secureTextEntry
               autoCapitalize="none"
-              editable={!loading}
+              editable={!isLoading}
             />
           </View>
 
-          <AppButton
-            title="S'inscrire"
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.colors.accent }]}
             onPress={handleRegister}
-            loading={loading}
-            disabled={loading}
-            style={styles.button}
-          />
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.buttonText}>S'inscrire</Text>
+            )}
+          </TouchableOpacity>
 
-          <Pressable
+          <TouchableOpacity
+            style={[styles.button, styles.quickButton]}
+            onPress={handleQuickRegister}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>🧪 Inscription Rapide</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.linkButton}
             onPress={() => router.back()}
-            disabled={loading}
+            disabled={isLoading}
           >
             <Text style={[styles.linkText, { color: theme.colors.accent }]}>
               Déjà un compte ? Se connecter
             </Text>
-          </Pressable>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -200,9 +259,21 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
+    textAlign: 'center',
   },
   form: {
     width: '100%',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#c62828',
+    fontSize: 14,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 20,
@@ -220,7 +291,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   button: {
-    marginTop: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  quickButton: {
+    backgroundColor: '#28a745',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   linkButton: {
     marginTop: 20,
@@ -231,4 +314,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-

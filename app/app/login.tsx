@@ -1,72 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
-  Pressable,
+  TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/theme/ThemeProvider';
-import { AppButton } from '@/components/AppButton';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
   const { theme } = useAppTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  // Redirection automatique si déjà authentifié
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      console.log('User already authenticated, checking profile completion...');
-      // Laisser l'AuthGuard gérer la redirection
-    }
-  }, [isAuthenticated, isLoading]);
+  const [error, setError] = useState('');
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      setError('Veuillez remplir tous les champs');
       return;
     }
 
-    setLoading(true);
+    setError('');
     try {
-      console.log('=== LOGIN SIMPLIFIÉ ===');
-      
-      // Appel direct à l'API sans passer par le hook useAuth
-      const response = await fetch('http://172.20.10.2:8000/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password })
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Erreur de connexion');
-      }
-      
-      const data = await response.json();
-      console.log('✅ Connexion réussie');
-      
-      // Redirection directe
-      router.push('/(tabs)');
-      
+      await login({ username: username.trim(), password });
+      console.log('✅ Connexion réussie, redirection...');
+      router.replace('/(tabs)');
     } catch (error) {
       console.error('❌ Erreur de connexion:', error);
-      Alert.alert(
-        'Erreur de connexion',
-        error instanceof Error ? error.message : 'Nom d\'utilisateur ou mot de passe incorrect'
-      );
-    } finally {
-      setLoading(false);
+      setError(error instanceof Error ? error.message : 'Erreur de connexion');
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setError('');
+    try {
+      await login({ username: 'demo', password: 'DemoPassword123' });
+      console.log('✅ Connexion demo réussie');
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('❌ Erreur connexion demo:', error);
+      setError('Impossible de se connecter avec le compte demo');
     }
   };
 
@@ -78,62 +59,93 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.colors.textPrimary }]}>🦍 Gorillax</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Connecte-toi pour continuer</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+            Connecte-toi à ton compte
+          </Text>
         </View>
 
         <View style={styles.form}>
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.inputContainer}>
-            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>Nom d'utilisateur</Text>
+            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
+              Nom d'utilisateur
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.textPrimary,
+                  borderColor: theme.colors.border,
+                },
+              ]}
               value={username}
               onChangeText={setUsername}
-              placeholder="Entrez votre nom d'utilisateur"
+              placeholder="Ton nom d'utilisateur"
               placeholderTextColor={theme.colors.textSecondary}
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!loading}
+              editable={!isLoading}
             />
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>Mot de passe</Text>
+            <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
+              Mot de passe
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surface, color: theme.colors.textPrimary, borderColor: theme.colors.border }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.textPrimary,
+                  borderColor: theme.colors.border,
+                },
+              ]}
               value={password}
               onChangeText={setPassword}
-              placeholder="Entrez votre mot de passe"
+              placeholder="Ton mot de passe"
               placeholderTextColor={theme.colors.textSecondary}
               secureTextEntry
               autoCapitalize="none"
-              editable={!loading}
+              editable={!isLoading}
             />
           </View>
 
-          <AppButton
-            title="Se connecter"
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.colors.accent }]}
             onPress={handleLogin}
-            loading={loading}
-            disabled={loading}
-            style={styles.button}
-          />
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.buttonText}>Se connecter</Text>
+            )}
+          </TouchableOpacity>
 
-          <AppButton
-            title="🚀 Test Navigation"
-            onPress={() => router.push('/(tabs)')}
-            variant="secondary"
-            style={[styles.button, { marginTop: 10 }]}
-          />
+          <TouchableOpacity
+            style={[styles.button, styles.demoButton]}
+            onPress={handleDemoLogin}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>🧪 Connexion Demo</Text>
+          </TouchableOpacity>
 
-          <Pressable
+          <TouchableOpacity
             style={styles.linkButton}
             onPress={() => router.push('/register')}
-            disabled={loading}
+            disabled={isLoading}
           >
             <Text style={[styles.linkText, { color: theme.colors.accent }]}>
-              Pas encore de compte ? S'inscrire
+              Pas encore inscrit ? Créer un compte
             </Text>
-          </Pressable>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -160,9 +172,21 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
+    textAlign: 'center',
   },
   form: {
     width: '100%',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#c62828',
+    fontSize: 14,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 20,
@@ -180,7 +204,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   button: {
-    marginTop: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  demoButton: {
+    backgroundColor: '#28a745',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   linkButton: {
     marginTop: 20,
@@ -191,4 +227,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
