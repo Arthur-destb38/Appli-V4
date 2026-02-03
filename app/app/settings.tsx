@@ -21,7 +21,9 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { apiCall } from '@/utils/api';
+import { updateRemoteProfile } from '@/services/userProfileApi';
 
 interface ProfileSetupData {
   // Informations personnelles
@@ -76,8 +78,9 @@ const GENDER_OPTIONS = [
 ];
 
 export default function SettingsScreen() {
-  const { theme } = useAppTheme();
+  const { theme, toggleMode } = useAppTheme();
   const { user, logout, updateProfile } = useAuth();
+  const { profile, refresh } = useUserProfile();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -605,6 +608,52 @@ export default function SettingsScreen() {
                       );
                     })}
                   </View>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Apparence */}
+          <View style={[styles.section, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              onPress={() => toggleSection('appearance')}
+            >
+              <View style={styles.sectionHeaderLeft}>
+                <View style={[styles.sectionIcon, { backgroundColor: '#6366f1' + '20' }]}>
+                  <Ionicons name="color-palette" size={20} color="#6366f1" />
+                </View>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>
+                  Apparence
+                </Text>
+              </View>
+              <Ionicons
+                name={expandedSection === 'appearance' ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={theme.colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {expandedSection === 'appearance' && (
+              <View style={styles.sectionContent}>
+                <View style={styles.switchContainer}>
+                  <View style={styles.switchTextContainer}>
+                    <Text style={[styles.switchTitle, { color: theme.colors.textPrimary }]}>
+                      Mode sombre
+                    </Text>
+                    <Text style={[styles.switchDescription, { color: theme.colors.textSecondary }]}>
+                      Interface sombre pour tes yeux
+                    </Text>
+                  </View>
+                  <Switch
+                    value={theme.mode === 'dark'}
+                    onValueChange={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      toggleMode();
+                    }}
+                    trackColor={{ false: theme.colors.surfaceMuted, true: theme.colors.accent }}
+                    thumbColor={theme.mode === 'dark' ? '#FFFFFF' : '#FFFFFF'}
+                  />
                 </View>
               </View>
             )}

@@ -629,19 +629,9 @@ export default function HomeScreen() {
               {/* Section Profil élégante */}
               <View style={styles.drawerProfileSection}>
                 <View style={styles.drawerProfileHeader}>
-                  <View style={[styles.drawerAvatar, { backgroundColor: theme.colors.accent }]}>
-                    <Text style={styles.drawerAvatarText}>
-                      {displayUser.username.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.drawerProfileInfo}>
-                    <Text style={[styles.drawerProfileName, { color: theme.colors.textPrimary }]}>
-                      {username}
-                    </Text>
-                    <Text style={[styles.drawerProfileSubtitle, { color: theme.colors.textSecondary }]}>
-                      {stats.completed} séances terminées
-                    </Text>
-                  </View>
+                  <Text style={styles.drawerMenuTitle}>
+                    Menu
+                  </Text>
                   <Pressable
                     onPress={closeMenu}
                     style={({ pressed }) => [
@@ -687,20 +677,6 @@ export default function HomeScreen() {
                       {stats.completedThisWeek >= goalSessions ? ' ✅' : ''}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.drawerItem,
-                    { backgroundColor: pressed ? '#8b5cf615' : 'transparent' },
-                  ]}
-                  onPress={() => goTo('/messages')}
-                >
-                  <View style={[styles.drawerItemIcon, { backgroundColor: '#8b5cf620' }]}>
-                    <Ionicons name="chatbubbles" size={22} color="#8b5cf6" />
-                  </View>
-                  <Text style={[styles.drawerItemText, { color: theme.colors.textPrimary }]}>Messages</Text>
                   <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
                 </Pressable>
 
@@ -917,37 +893,17 @@ const styles = StyleSheet.create({
   drawerProfileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    justifyContent: 'space-between',
   },
-  drawerAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  drawerAvatarText: {
-    color: '#fff',
-    fontSize: 24,
+  drawerMenuTitle: {
+    fontSize: 22,
     fontWeight: '800',
+    letterSpacing: -0.5,
+    color: '#6366F1', // Couleur accent pour le branding
   },
-  drawerProfileInfo: {
-    flex: 1,
-  },
-  drawerProfileName: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  drawerProfileSubtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
+
+
+
   drawerCloseBtn: {
     width: 40,
     height: 40,
