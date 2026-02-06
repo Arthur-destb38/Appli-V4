@@ -191,3 +191,4 @@ pnpm start
 ---
 
 Projet M2 MoSEF — Paris 1 — 2025
+

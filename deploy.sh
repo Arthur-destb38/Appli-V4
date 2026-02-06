@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#
+
 # 🦍 Gorillax - Script de déploiement automatisé
 # 
 # Usage: ./deploy.sh [options]
