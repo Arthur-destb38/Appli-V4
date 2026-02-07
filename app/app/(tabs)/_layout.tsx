@@ -1,17 +1,42 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppTheme } from '@/theme/ThemeProvider';
 import { useTranslations } from '@/hooks/usePreferences';
-import { SimpleAuthGuard } from '@/components/SimpleAuthGuard';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function TabLayout() {
   const { theme } = useAppTheme();
   const { t, isLoading } = useTranslations();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  // 🔒 BLOQUER L'ACCÈS SI PAS AUTHENTIFIÉ
+  useEffect(() => {
+    console.log('🔒 TabLayout - authLoading:', authLoading, 'isAuthenticated:', isAuthenticated);
+    if (!authLoading && !isAuthenticated) {
+      console.log('❌ Accès refusé aux tabs - redirection vers login');
+      router.replace('/login');
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  // Afficher un loader pendant la vérification
+  if (authLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+        <ActivityIndicator size="large" color={theme.colors.accent} />
+      </View>
+    );
+  }
+
+  // Si pas authentifié, ne rien afficher (la redirection va se faire)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   // Si les traductions sont en cours de chargement, utiliser les valeurs par défaut
   const getTitle = (key: string, fallback: string) => {
@@ -19,7 +44,6 @@ export default function TabLayout() {
   };
 
   return (
-    // Pas d'AuthGuard - accès direct
     <Tabs
       screenOptions={{
         headerShown: false,

@@ -146,11 +146,17 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
+    console.log('🔓 Demande de déconnexion...');
     try {
       await logout();
-      router.replace('/login');
+      console.log('✅ Logout terminé, redirection vers login...');
+      // Attendre un peu pour que l'état soit bien mis à jour
+      setTimeout(() => {
+        router.replace('/login');
+      }, 100);
     } catch (error) {
-      console.error('Erreur logout:', error);
+      console.error('❌ Erreur logout:', error);
+      // Même en cas d'erreur, rediriger vers login
       router.replace('/login');
     }
   };
@@ -360,10 +366,16 @@ export default function ProfileScreen() {
             style={[styles.logoutButton, { backgroundColor: theme.colors.error + '15' }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-              Alert.alert('Déconnexion', 'Es-tu sûr de vouloir te déconnecter ?', [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Déconnexion', style: 'destructive', onPress: handleLogout },
-              ]);
+              if (Platform.OS === 'web') {
+                if (typeof window !== 'undefined' && window.confirm('Es-tu sûr de vouloir te déconnecter ?')) {
+                  handleLogout();
+                }
+              } else {
+                Alert.alert('Déconnexion', 'Es-tu sûr de vouloir te déconnecter ?', [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'Déconnexion', style: 'destructive', onPress: handleLogout },
+                ]);
+              }
             }}
           >
             <Ionicons name="log-out-outline" size={20} color={theme.colors.error} />

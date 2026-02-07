@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -107,21 +108,24 @@ const ProfileScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={async () => {
-              Alert.alert(
-                'Déconnexion',
-                'Es-tu sûr de vouloir te déconnecter ?',
-                [
-                  { text: 'Annuler', style: 'cancel' },
-                  {
-                    text: 'Déconnexion',
-                    style: 'destructive',
-                    onPress: async () => {
-                      await logout();
-                      router.replace('/login');
-                    },
-                  },
-                ]
-              );
+              const doLogout = async () => {
+                await logout();
+                router.replace('/login');
+              };
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                if (window.confirm('Es-tu sûr de vouloir te déconnecter ?')) {
+                  await doLogout();
+                }
+              } else {
+                Alert.alert(
+                  'Déconnexion',
+                  'Es-tu sûr de vouloir te déconnecter ?',
+                  [
+                    { text: 'Annuler', style: 'cancel' },
+                    { text: 'Déconnexion', style: 'destructive', onPress: doLogout },
+                  ]
+                );
+              }
             }}
           >
             <Text style={styles.logoutButtonText}>Se déconnecter</Text>

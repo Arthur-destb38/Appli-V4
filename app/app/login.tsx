@@ -33,9 +33,18 @@ export default function LoginScreen() {
       await login({ username: username.trim(), password });
       console.log('✅ Connexion réussie, redirection...');
       router.replace('/(tabs)');
-    } catch (error) {
-      console.error('❌ Erreur de connexion:', error);
-      setError(error instanceof Error ? error.message : 'Erreur de connexion');
+    } catch (err) {
+      console.error('❌ Erreur de connexion:', err);
+      // Extraire le message d'erreur proprement
+      let errorMessage = 'Erreur de connexion';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err && typeof err === 'object' && 'detail' in err) {
+        errorMessage = String((err as any).detail);
+      }
+      setError(errorMessage);
     }
   };
 
@@ -45,9 +54,13 @@ export default function LoginScreen() {
       await login({ username: 'demo', password: 'DemoPassword123' });
       console.log('✅ Connexion demo réussie');
       router.replace('/(tabs)');
-    } catch (error) {
-      console.error('❌ Erreur connexion demo:', error);
-      setError('Impossible de se connecter avec le compte demo');
+    } catch (err) {
+      console.error('❌ Erreur connexion demo:', err);
+      let errorMessage = 'Impossible de se connecter avec le compte demo';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
     }
   };
 

@@ -210,27 +210,30 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      t('logout'),
-      t('logoutConfirm'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('logoutButton'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              router.replace('/login');
-    } catch (error) {
-              console.error('Erreur déconnexion:', error);
-              router.replace('/login');
-            }
-          },
-        },
-      ]
-    );
+  const handleLogout = async () => {
+    const doLogout = async () => {
+      try {
+        await logout();
+        router.replace('/login');
+      } catch (error) {
+        console.error('Erreur déconnexion:', error);
+        router.replace('/login');
+      }
+    };
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm(t('logoutConfirm'))) {
+        await doLogout();
+      }
+    } else {
+      Alert.alert(
+        t('logout'),
+        t('logoutConfirm'),
+        [
+          { text: t('cancel'), style: 'cancel' },
+          { text: t('logoutButton'), style: 'destructive', onPress: doLogout },
+        ]
+      );
+    }
   };
 
   const toggleSection = (section: string) => {
