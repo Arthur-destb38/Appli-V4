@@ -134,7 +134,7 @@ def register_v2(payload: RegisterRequestV2, request: Request, session: Session =
     
     # Générer le token de vérification email
     verification_token = generate_verification_token()
-    verification_expires = datetime.utcnow() + timedelta(hours=24)
+    verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
     
     # Créer l'utilisateur
     user = User(
@@ -230,7 +230,7 @@ def register(payload: RegisterRequest, request: Request, session: Session = Depe
     
     # Générer le token de vérification email
     verification_token = generate_verification_token()
-    verification_expires = datetime.utcnow() + timedelta(hours=24)
+    verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
     
     # Créer l'utilisateur
     user = User(
@@ -317,8 +317,8 @@ def refresh_token(
     if not db_token or db_token.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
     
-    # Comparer les dates (utiliser datetime.utcnow() pour être cohérent avec le modèle)
-    if db_token.expires_at < datetime.utcnow():
+    # Comparer les dates (utiliser datetime.now(timezone.utc) pour être cohérent avec le modèle)
+    if db_token.expires_at < datetime.now(timezone.utc):
         session.delete(db_token)
         session.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token_expired")
@@ -343,7 +343,7 @@ def verify_email(payload: VerifyEmailRequest, session: Session = Depends(get_ses
     user = session.exec(
         select(User).where(
             User.email_verification_token == payload.token,
-            User.email_verification_expires > datetime.utcnow()
+            User.email_verification_expires > datetime.now(timezone.utc)
         )
     ).first()
     
@@ -369,7 +369,7 @@ def resend_verification(current_user: User = Depends(_get_current_user), session
     
     # Générer un nouveau token
     verification_token = generate_verification_token()
-    verification_expires = datetime.utcnow() + timedelta(hours=24)
+    verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
     
     current_user.email_verification_token = verification_token
     current_user.email_verification_expires = verification_expires
@@ -396,7 +396,7 @@ def reset_password(payload: ResetPasswordRequest, session: Session = Depends(get
     
     # Générer le token de reset
     reset_token = generate_verification_token()
-    reset_expires = datetime.utcnow() + timedelta(hours=1)  # 1 heure seulement
+    reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)  # 1 heure seulement
     
     user.reset_password_token = reset_token
     user.reset_password_expires = reset_expires
@@ -418,7 +418,7 @@ def reset_password_confirm(payload: ResetPasswordConfirm, session: Session = Dep
     user = session.exec(
         select(User).where(
             User.reset_password_token == payload.token,
-            User.reset_password_expires > datetime.utcnow()
+            User.reset_password_expires > datetime.now(timezone.utc)
         )
     ).first()
     
