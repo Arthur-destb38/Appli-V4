@@ -1,5 +1,5 @@
 """Routes d'administration."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from ..db import get_session
 from ..models import User
@@ -125,3 +125,38 @@ def create_demo_users(session: Session = Depends(get_session)):
     except Exception as e:
         session.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/debug/schema")
+def debug_schema(session: Session = Depends(get_session)):
+    """Debug endpoint to check database schema."""
+    from sqlalchemy import text
+    from ..db import _database_url
+    from sqlalchemy.engine.url import make_url
+    
+    try:
+        url = _database_url()
+        parsed_url = make_url(url)
+        is_postgres = parsed_url.get_backend_name() == "postgresql"
+        
+        if is_postgres:
+            # Check user table columns
+            result = session.exec(text(
+                "SELECT column_name, data_type FROM information_schema.columns "
+                "WHERE table_name='user' ORDER BY ordinal_position"
+            ))
+            columns = [{"name": row[0], "type": row[1]} for row in result]
+            
+            # Check if demo user exists
+            demo_user = session.exec(select(User).where(User.username == "demo")).first()
+            
+            return {
+                "database": "postgresql",
+                "user_table_columns": columns,
+                "demo_user_exists": demo_user is not None,
+                "demo_user_id": demo_user.id if demo_user else None
+            }
+        else:
+            return {"database": "sqlite", "message": "Schema check only works on PostgreSQL"}
+    except Exception as e:
+        return {"error": str(e)}
