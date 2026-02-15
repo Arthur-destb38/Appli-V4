@@ -160,3 +160,33 @@ def debug_schema(session: Session = Depends(get_session)):
             return {"database": "sqlite", "message": "Schema check only works on PostgreSQL"}
     except Exception as e:
         return {"error": str(e)}
+
+
+
+@router.post("/debug/test-login")
+def debug_test_login(session: Session = Depends(get_session)):
+    """Debug endpoint to test login logic."""
+    from ..utils.auth import verify_password
+    from datetime import datetime, timezone
+    
+    try:
+        # Get demo user
+        demo_user = session.exec(select(User).where(User.username == "demo")).first()
+        
+        if not demo_user:
+            return {"error": "Demo user not found"}
+        
+        # Test password verification
+        password_correct = verify_password("DemoPassword123", demo_user.password_hash)
+        
+        return {
+            "user_found": True,
+            "username": demo_user.username,
+            "email": demo_user.email,
+            "password_hash_length": len(demo_user.password_hash),
+            "password_correct": password_correct,
+            "email_verified": demo_user.email_verified,
+            "created_at": demo_user.created_at.isoformat() if demo_user.created_at else None
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
