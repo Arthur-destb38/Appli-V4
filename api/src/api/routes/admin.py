@@ -190,3 +190,53 @@ def debug_test_login(session: Session = Depends(get_session)):
         }
     except Exception as e:
         return {"error": str(e), "type": type(e).__name__}
+
+
+
+@router.post("/debug/full-login-test")
+def debug_full_login_test(session: Session = Depends(get_session)):
+    """Debug endpoint to test full login flow."""
+    from ..utils.auth import verify_password, create_access_token, create_refresh_token
+    from ..models import RefreshToken
+    from datetime import datetime, timezone
+    
+    try:
+        # Step 1: Get user
+        demo_user = session.exec(select(User).where(User.username == "demo")).first()
+        if not demo_user:
+            return {"step": "get_user", "error": "User not found"}
+        
+        # Step 2: Verify password
+        password_ok = verify_password("DemoPassword123", demo_user.password_hash)
+        if not password_ok:
+            return {"step": "verify_password", "error": "Password incorrect"}
+        
+        # Step 3: Create access token
+        try:
+            access_token = create_access_token(demo_user.id)
+        except Exception as e:
+            return {"step": "create_access_token", "error": str(e), "type": type(e).__name__}
+        
+        # Step 4: Create refresh token
+        try:
+            refresh_token, exp = create_refresh_token(demo_user.id)
+        except Exception as e:
+            return {"step": "create_refresh_token", "error": str(e), "type": type(e).__name__}
+        
+        # Step 5: Save refresh token
+        try:
+            rt = RefreshToken(token=refresh_token, user_id=demo_user.id, expires_at=exp)
+            session.add(rt)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            return {"step": "save_refresh_token", "error": str(e), "type": type(e).__name__}
+        
+        return {
+            "success": True,
+            "access_token_length": len(access_token),
+            "refresh_token_length": len(refresh_token),
+            "expires_at": exp.isoformat()
+        }
+    except Exception as e:
+        return {"step": "unknown", "error": str(e), "type": type(e).__name__}
