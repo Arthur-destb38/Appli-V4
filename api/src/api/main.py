@@ -32,13 +32,47 @@ from .seeds import seed_exercises
 from .services.exercise_loader import import_exercises_from_url
 from sqlmodel import Session, select, func
 from .db import get_engine
-from .models import Exercise
+from .models import Exercise, User
+from .utils.auth import hash_password
+
+
+def ensure_demo_user() -> None:
+    """Crée ou met à jour le compte démo (demo / DemoPassword123) au démarrage."""
+    try:
+        engine = get_engine()
+        with Session(engine) as session:
+            demo = session.exec(select(User).where(User.username == "demo")).first()
+            if demo:
+                demo.password_hash = hash_password("DemoPassword123")
+                demo.email_verified = True
+                if getattr(demo, "email", None) is None:
+                    demo.email = "demo@gorillax.local"
+                session.add(demo)
+                session.commit()
+                print("✅ Compte demo mis à jour (username: demo, password: DemoPassword123)")
+            else:
+                demo_user = User(
+                    id="demo",
+                    username="demo",
+                    email="demo@gorillax.local",
+                    password_hash=hash_password("DemoPassword123"),
+                    consent_to_public_share=True,
+                    bio="Compte de démonstration 🦍",
+                    objective="Découvrir Gorillax",
+                    email_verified=True,
+                )
+                session.add(demo_user)
+                session.commit()
+                print("✅ Compte demo créé (username: demo, password: DemoPassword123)")
+    except Exception as e:
+        print(f"⚠️  Compte demo non créé (vérifier que la migration auth est appliquée): {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    
+    ensure_demo_user()
+
     # Charger les exercices au démarrage si la base est vide
     engine = get_engine()
     with Session(engine) as session:
