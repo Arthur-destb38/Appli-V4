@@ -41,12 +41,19 @@ def ensure_demo_user() -> None:
     try:
         engine = get_engine()
         with Session(engine) as session:
+            # Chercher par username puis par email (évite UNIQUE constraint si l'email existe déjà)
             demo = session.exec(select(User).where(User.username == "demo")).first()
+            if not demo:
+                demo = session.exec(select(User).where(User.email == "demo@gorillax.local")).first()
             if demo:
+                demo.username = "demo"
+                demo.email = "demo@gorillax.local"
                 demo.password_hash = hash_password("DemoPassword123")
                 demo.email_verified = True
-                if getattr(demo, "email", None) is None:
-                    demo.email = "demo@gorillax.local"
+                if getattr(demo, "bio", None) is None or demo.bio == "":
+                    demo.bio = "Compte de démonstration 🦍"
+                if getattr(demo, "objective", None) is None or demo.objective == "":
+                    demo.objective = "Découvrir Gorillax"
                 session.add(demo)
                 session.commit()
                 print("✅ Compte demo mis à jour (username: demo, password: DemoPassword123)")
