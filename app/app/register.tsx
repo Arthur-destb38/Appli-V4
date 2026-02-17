@@ -22,7 +22,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
 
   const validateForm = () => {
     if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
@@ -32,13 +32,6 @@ export default function RegisterScreen() {
 
     if (username.trim().length < 3) {
       setError('Le nom d\'utilisateur doit contenir au moins 3 caractères');
-      return false;
-    }
-
-    // Validation du format du username
-    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
-    if (!usernameRegex.test(username.trim())) {
-      setError('Le nom d\'utilisateur ne peut contenir que des lettres, chiffres, tirets et underscores');
       return false;
     }
 
@@ -53,20 +46,6 @@ export default function RegisterScreen() {
       return false;
     }
 
-    // Validation de la complexité du mot de passe
-    if (!/[a-z]/.test(password)) {
-      setError('Le mot de passe doit contenir au moins une minuscule');
-      return false;
-    }
-    if (!/[A-Z]/.test(password)) {
-      setError('Le mot de passe doit contenir au moins une majuscule');
-      return false;
-    }
-    if (!/\d/.test(password)) {
-      setError('Le mot de passe doit contenir au moins un chiffre');
-      return false;
-    }
-
     if (password !== confirmPassword) {
       setError('Les mots de passe ne correspondent pas');
       return false;
@@ -76,14 +55,10 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    console.log('🔵 handleRegister appelé');
-    
     if (!validateForm()) {
-      console.log('❌ Validation échouée');
       return;
     }
 
-    console.log('✅ Validation OK, inscription en cours...');
     setError('');
     try {
       await register({
@@ -93,19 +68,9 @@ export default function RegisterScreen() {
       });
       console.log('✅ Inscription réussie, redirection vers profil...');
       router.replace('/profile-setup-simple');
-    } catch (err) {
-      console.error('❌ Erreur d\'inscription:', err);
-      // Extraire le message d'erreur proprement
-      let errorMessage = 'Erreur lors de l\'inscription';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'string') {
-        errorMessage = err;
-      } else if (err && typeof err === 'object' && 'detail' in err) {
-        errorMessage = String((err as any).detail);
-      }
-      console.log('📝 Message d\'erreur:', errorMessage);
-      setError(errorMessage);
+    } catch (error) {
+      console.error('❌ Erreur d\'inscription:', error);
+      setError(error instanceof Error ? error.message : 'Erreur lors de l\'inscription');
     }
   };
 
@@ -120,13 +85,9 @@ export default function RegisterScreen() {
       });
       console.log('✅ Inscription rapide réussie');
       router.replace('/profile-setup-simple');
-    } catch (err) {
-      console.error('❌ Erreur inscription rapide:', err);
-      let errorMessage = 'Erreur lors de l\'inscription rapide';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      setError(errorMessage);
+    } catch (error) {
+      console.error('❌ Erreur inscription rapide:', error);
+      setError('Erreur lors de l\'inscription rapide');
     }
   };
 
@@ -146,7 +107,7 @@ export default function RegisterScreen() {
         <View style={styles.form}>
           {error ? (
             <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{String(error)}</Text>
+              <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
@@ -169,7 +130,6 @@ export default function RegisterScreen() {
               placeholderTextColor={theme.colors.textSecondary}
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete="username-new"
               editable={!isLoading}
             />
           </View>
@@ -194,7 +154,6 @@ export default function RegisterScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete="email"
               editable={!isLoading}
             />
           </View>
@@ -202,9 +161,6 @@ export default function RegisterScreen() {
           <View style={styles.inputContainer}>
             <Text style={[styles.label, { color: theme.colors.textPrimary }]}>
               Mot de passe
-            </Text>
-            <Text style={[styles.hint, { color: theme.colors.textSecondary }]}>
-              Min 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre
             </Text>
             <TextInput
               style={[
@@ -217,11 +173,10 @@ export default function RegisterScreen() {
               ]}
               value={password}
               onChangeText={setPassword}
-              placeholder="Ex: MonMotDePasse123"
+              placeholder="Au moins 8 caractères"
               placeholderTextColor={theme.colors.textSecondary}
               secureTextEntry
               autoCapitalize="none"
-              autoComplete="password-new"
               editable={!isLoading}
             />
           </View>
@@ -245,21 +200,13 @@ export default function RegisterScreen() {
               placeholderTextColor={theme.colors.textSecondary}
               secureTextEntry
               autoCapitalize="none"
-              autoComplete="password-new"
               editable={!isLoading}
             />
           </View>
 
           <TouchableOpacity
-            style={[
-              styles.button, 
-              { backgroundColor: theme.colors.accent },
-              isLoading && { opacity: 0.6 }
-            ]}
-            onPress={() => {
-              console.log('🔘 Bouton S\'inscrire cliqué');
-              handleRegister();
-            }}
+            style={[styles.button, { backgroundColor: theme.colors.accent }]}
+            onPress={handleRegister}
             disabled={isLoading}
           >
             {isLoading ? (
@@ -335,11 +282,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
-  },
-  hint: {
-    fontSize: 12,
-    marginBottom: 6,
-    fontStyle: 'italic',
   },
   input: {
     height: 50,

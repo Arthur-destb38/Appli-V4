@@ -59,6 +59,9 @@ def _get_current_user(
     token = authorization.split(" ", 1)[1]
     try:
         payload = decode_token(token)
+    except ValueError as e:
+        detail = "token_expired" if "token_expired" in str(e) else "invalid_token"
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
     if payload.get("type") != "access":
@@ -306,6 +309,9 @@ def refresh_token(
     token = _get_refresh_from_header(authorization)
     try:
         payload = decode_token(token)
+    except ValueError as e:
+        detail = "token_expired" if "token_expired" in str(e) else "invalid_token"
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
     if payload.get("type") != "refresh":
@@ -317,8 +323,12 @@ def refresh_token(
     if not db_token or db_token.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
     
-    # Comparer les dates (utiliser datetime.now(timezone.utc) pour être cohérent avec le modèle)
-    if db_token.expires_at < datetime.now(timezone.utc):
+    # Comparer les dates (rendre expires_at timezone-aware si lu depuis PostgreSQL sans TZ)
+    now = datetime.now(timezone.utc)
+    expires_at = db_token.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < now:
         session.delete(db_token)
         session.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token_expired")

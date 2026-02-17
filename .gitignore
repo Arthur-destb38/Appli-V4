@@ -29,9 +29,11 @@ api/#/
 # SQLite database
 *.db
 
-# Env/config
+# Env / config (ne jamais commiter les secrets)
 .env
 .env.*
+api/.env
+.cursor/mcp.json
 
 # OS/Editor
 .DS_Store

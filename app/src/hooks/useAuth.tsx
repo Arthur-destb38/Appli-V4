@@ -64,7 +64,6 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
 
   const loadStoredAuth = async () => {
     try {
-      console.log('🔍 Vérification de la session stockée...');
       const [storedAccessToken, storedRefreshToken, storedUser] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
         AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
@@ -72,40 +71,16 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       ]);
 
       if (storedAccessToken && storedRefreshToken && storedUser) {
-        console.log('📦 Session trouvée, validation du token...');
-        
-        // Valider le token en appelant /auth/me
-        try {
-          const response = await fetch(buildApiUrl('/auth/me'), {
-            headers: {
-              'Authorization': `Bearer ${storedAccessToken}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (response.ok) {
-            const userData = await response.json();
-            setTokens({
-              access_token: storedAccessToken,
-              refresh_token: storedRefreshToken,
-              token_type: 'bearer',
-            });
-            setUser(userData);
-            console.log('✅ Session restaurée et validée');
-          } else {
-            console.log('⚠️ Token invalide, nettoyage de la session');
-            await clearAuth();
-          }
-        } catch (error) {
-          console.log('⚠️ Erreur de validation, nettoyage de la session');
-          await clearAuth();
-        }
-      } else {
-        console.log('ℹ️ Aucune session stockée');
+        setTokens({
+          access_token: storedAccessToken,
+          refresh_token: storedRefreshToken,
+          token_type: 'bearer',
+        });
+        setUser(JSON.parse(storedUser));
+        console.log('✅ Session restaurée depuis le stockage');
       }
     } catch (error) {
       console.error('❌ Erreur lors du chargement de la session:', error);
-      await clearAuth();
     } finally {
       setIsLoading(false);
     }
@@ -221,7 +196,6 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   }, []);
 
   const handleLogout = useCallback(async () => {
-    console.log('🚪 Déconnexion en cours...');
     setIsLoading(true);
     try {
       // Appeler l'endpoint de déconnexion si on a un token
@@ -238,27 +212,10 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         });
       }
 
-      // Effacer TOUTES les données locales
-      try {
-        const { clearAll } = await import('@/db/workouts-repository');
-        const { clearAllMutations } = await import('@/db/mutation-queue');
-        const { clearSyncState } = await import('@/db/sync-state');
-        
-        await clearAll();
-        await clearAllMutations();
-        await clearSyncState();
-        console.log('✅ Toutes les données locales effacées');
-      } catch (error) {
-        console.warn('⚠️ Erreur lors de l\'effacement des données locales:', error);
-      }
-
-      // Effacer complètement la session
       await clearAuth();
-      console.log('✅ Déconnexion réussie - session effacée');
+      console.log('✅ Déconnexion réussie');
     } catch (error) {
       console.error('❌ Erreur logout:', error);
-      // Même en cas d'erreur, on efface la session locale
-      await clearAuth();
     } finally {
       setIsLoading(false);
     }

@@ -19,6 +19,9 @@ def get_current_user(
     token = authorization.split(" ", 1)[1]
     try:
         payload = decode_token(token)
+    except ValueError as e:
+        detail = "token_expired" if "token_expired" in str(e) else "invalid_token"
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
     

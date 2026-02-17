@@ -75,8 +75,11 @@ def get_remaining_cooldown(session: Session, username: str, ip_address: str) -> 
     
     if not recent_attempt:
         return None
-    
-    elapsed = datetime.now(timezone.utc) - recent_attempt.created_at
+
+    created_at = recent_attempt.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    elapsed = datetime.now(timezone.utc) - created_at
     remaining = cooldown_minutes - elapsed.total_seconds() / 60
     
     return max(0, int(remaining))
