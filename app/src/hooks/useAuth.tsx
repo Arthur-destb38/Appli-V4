@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, PropsWithChildren } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearAllUserDataForLogout } from '@/db/clearUserData';
 import { buildApiUrl } from '@/utils/api';
 
 interface LoginRequest {
@@ -135,11 +136,15 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     setIsLoading(true);
     try {
       console.log('🔐 Connexion en cours...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
       const response = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ detail: 'Erreur de connexion' }));
@@ -155,8 +160,14 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
 
       await saveAuth(authTokens, userData);
       
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('❌ Erreur login:', error);
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Le serveur met trop de temps à répondre. Réessaie dans quelques secondes (serveur au réveil).');
+        }
+        throw error;
+      }
       throw error;
     } finally {
       setIsLoading(false);
@@ -212,6 +223,8 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         });
       }
 
+      // Vider les données locales (séances, sync, file de mutations, profil) pour isoler les comptes
+      await clearAllUserDataForLogout();
       await clearAuth();
       console.log('✅ Déconnexion réussie');
     } catch (error) {

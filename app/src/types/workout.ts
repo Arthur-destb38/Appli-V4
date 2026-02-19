@@ -2,7 +2,7 @@ export type WorkoutStatus = 'draft' | 'completed';
 
 export interface Workout {
   client_id?: string | null;
-  server_id?: number | null;
+  server_id?: string | null;
   user_id?: string | null;
   id: number;
   title: string;
@@ -14,7 +14,7 @@ export interface Workout {
 
 export interface WorkoutExercise {
   client_id?: string | null;
-  server_id?: number | null;
+  server_id?: string | null;
   id: number;
   workout_id: number;
   exercise_id: string;
@@ -25,7 +25,7 @@ export interface WorkoutExercise {
 
 export interface WorkoutSet {
   client_id?: string | null;
-  server_id?: number | null;
+  server_id?: string | null;
   id: number;
   workout_exercise_id: number;
   reps: number;

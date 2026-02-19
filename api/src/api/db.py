@@ -10,6 +10,13 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import make_url
 from sqlmodel import Session, select, SQLModel, create_engine
 
+
+def set_session_user_id(session: Session, user_id: str) -> None:
+    """Set app.current_user_id for RLS on PostgreSQL. No-op on SQLite."""
+    url = _database_url()
+    if url.startswith("postgresql"):
+        session.execute(text("SELECT set_config('app.current_user_id', :id, true)"), {"id": user_id})
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # api/
 DEFAULT_DB_PATH = BASE_DIR / "gorillax.db"
 

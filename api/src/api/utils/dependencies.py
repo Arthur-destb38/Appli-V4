@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 from fastapi import Depends, HTTPException, status, Header
 from sqlmodel import Session
 
-from ..db import get_session
+from ..db import get_session, set_session_user_id
 from ..models import User
 from .auth import decode_token
 
@@ -32,5 +32,5 @@ def get_current_user(
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
-    
+    set_session_user_id(session, str(user.id))
     return user

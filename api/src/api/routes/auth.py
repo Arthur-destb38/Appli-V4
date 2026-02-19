@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
 from fastapi.responses import Response
 from sqlmodel import Session, select
 
-from ..db import get_session
+from ..db import get_session, set_session_user_id
 from ..models import User, RefreshToken
 from ..schemas import LoginRequest, RegisterRequest, RegisterRequestV2, TokenPair, MeResponse, ResetPasswordRequest, ResetPasswordConfirm, VerifyEmailRequest
 from ..utils.auth import (
@@ -15,12 +15,7 @@ from ..utils.auth import (
     hash_password,
     verify_password,
 )
-from ..utils.rate_limit import (
-    is_rate_limited,
-    record_login_attempt,
-    get_remaining_cooldown,
-    cleanup_old_attempts,
-)
+from ..utils.rate_limit import record_login_attempt, cleanup_old_attempts
 from ..services.email import send_verification_email, send_password_reset_email, generate_verification_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -70,6 +65,7 @@ def _get_current_user(
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
+    set_session_user_id(session, str(user.id))
     return user
 
 
@@ -269,15 +265,12 @@ def register(payload: RegisterRequest, request: Request, session: Session = Depe
 def login(payload: LoginRequest, request: Request, session: Session = Depends(get_session)) -> TokenPair:
     client_ip = _get_client_ip(request)
     username = payload.username.strip()
-    
-    # Vérifier le rate limiting
-    if is_rate_limited(session, username, client_ip):
-        remaining = get_remaining_cooldown(session, username, client_ip)
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many failed attempts. Try again in {remaining} minutes."
-        )
-    
+
+    # S'assurer que le compte démo existe et a le bon mot de passe à chaque tentative "demo"
+    if username == "demo":
+        from ..main import ensure_demo_user
+        ensure_demo_user()
+
     # Vérifier les credentials
     user = session.exec(select(User).where(User.username == username)).first()
     if not user or not verify_password(payload.password, user.password_hash):

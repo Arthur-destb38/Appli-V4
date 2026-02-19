@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlmodel import Session, select
 
-from ..db import get_session
+from ..db import get_session, set_session_user_id
 from ..models import Exercise, Share, User, Workout, WorkoutExercise, Set
 from ..utils.slug import make_exercise_slug
 from ..utils.auth import decode_token
@@ -31,6 +31,7 @@ def _get_current_user_required(
         user = session.get(User, user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
+        set_session_user_id(session, str(user.id))
         return user
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")

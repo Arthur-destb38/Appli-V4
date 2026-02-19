@@ -10,14 +10,19 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppTheme } from '@/theme/ThemeProvider';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, isAuthenticated } = useAuth();
   const { theme } = useAppTheme();
+
+  // Déjà connecté → redirection directe (comme OPPS : if current_user.is_authenticated → dashboard)
+  if (isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
+  }
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -45,9 +50,10 @@ export default function LoginScreen() {
       await login({ username: 'demo', password: 'DemoPassword123' });
       console.log('✅ Connexion demo réussie');
       router.replace('/(tabs)');
-    } catch (error) {
-      console.error('❌ Erreur connexion demo:', error);
-      setError('Impossible de se connecter avec le compte demo');
+    } catch (err) {
+      console.error('❌ Erreur connexion demo:', err);
+      const message = err instanceof Error ? err.message : 'Impossible de se connecter avec le compte demo';
+      setError(message);
     }
   };
 
@@ -134,7 +140,11 @@ export default function LoginScreen() {
             onPress={handleDemoLogin}
             disabled={isLoading}
           >
-            <Text style={styles.buttonText}>🧪 Connexion Demo</Text>
+            {isLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.buttonText}>🧪 Connexion Demo</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity

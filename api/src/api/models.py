@@ -81,15 +81,19 @@ class Exercise(SQLModel, table=True):
 
 class WorkoutExercise(SQLModel, table=True):
     id: str = Field(default_factory=generate_uuid, primary_key=True)
+    client_id: Optional[str] = Field(default=None, index=True)
     workout_id: str = Field(index=True)
     exercise_id: str
     order_index: int = Field(default=0)
     planned_sets: Optional[int] = None
     notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
 
 class Set(SQLModel, table=True):
     id: str = Field(default_factory=generate_uuid, primary_key=True)
+    client_id: Optional[str] = Field(default=None, index=True)
     workout_exercise_id: str = Field(index=True)
     order: int = Field(default=0)
     reps: Optional[int] = None
@@ -99,6 +103,7 @@ class Set(SQLModel, table=True):
     completed: bool = Field(default=False)
     done_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
 
 class Program(SQLModel, table=True):

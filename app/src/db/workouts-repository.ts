@@ -99,8 +99,6 @@ export const fetchWorkouts = async (userId?: string | null): Promise<WorkoutWith
     return mapFallbackData();
   }
 
-  // Ne pas filtrer par user_id localement - le filtrage se fait côté serveur
-  // La base locale contient uniquement les données de l'utilisateur connecté
   const workoutsResult = await runSql(
     `SELECT * FROM workouts WHERE deleted_at IS NULL ORDER BY updated_at DESC`
   );
@@ -160,19 +158,20 @@ export const createWorkout = async (
 
 export const createWorkoutWithServerId = async (
   title: string,
-  serverId: string | number,
-  userId?: string | null
+  serverId: string,
+  userId?: string | null,
+  originalClientId?: string | null
 ): Promise<{ id: number; client_id: string | null; created_at: number; updated_at: number }> => {
+  const clientId = originalClientId || generateClientId();
+
   if (isUsingFallbackDatabase()) {
     const store = getFallbackStore();
     const now = Date.now();
     const id = ++store.counters.workout;
-    const clientId = generateClientId();
-    const serverIdNum = typeof serverId === 'string' ? parseInt(serverId, 10) : serverId;
     const workoutRow: WorkoutRow = {
       id,
       client_id: clientId,
-      server_id: serverIdNum,
+      server_id: serverId,
       user_id: userId || null,
       title,
       status: 'draft',
@@ -185,14 +184,80 @@ export const createWorkoutWithServerId = async (
   }
 
   const now = Date.now();
-  const clientId = generateClientId();
-  const serverIdNum = typeof serverId === 'string' ? parseInt(serverId, 10) : serverId;
   const result = await runSql(
     'INSERT INTO workouts (client_id, server_id, user_id, title, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [clientId, serverIdNum, userId || null, title, 'draft', now, now]
+    [clientId, serverId, userId || null, title, 'draft', now, now]
   );
   const insertedId = result.insertId ?? 0;
   return { id: insertedId, client_id: clientId, created_at: now, updated_at: now };
+};
+
+export const createExerciseWithServerId = async (
+  workoutLocalId: number,
+  exerciseId: string,
+  orderIndex: number,
+  plannedSets: number | null,
+  serverId: string,
+  originalClientId?: string | null
+): Promise<{ id: number; client_id: string | null }> => {
+  const clientId = originalClientId || generateClientId();
+
+  if (isUsingFallbackDatabase()) {
+    const store = getFallbackStore();
+    const id = ++store.counters.workoutExercise;
+    store.workoutExercises.push({
+      id,
+      client_id: clientId,
+      server_id: serverId,
+      workout_id: workoutLocalId,
+      exercise_id: exerciseId,
+      order_index: orderIndex,
+      planned_sets: plannedSets,
+      deleted_at: null,
+    });
+    return { id, client_id: clientId };
+  }
+
+  const result = await runSql(
+    'INSERT INTO workout_exercises (client_id, server_id, workout_id, exercise_id, order_index, planned_sets) VALUES (?, ?, ?, ?, ?, ?)',
+    [clientId, serverId, workoutLocalId, exerciseId, orderIndex, plannedSets]
+  );
+  return { id: result.insertId ?? 0, client_id: clientId };
+};
+
+export const createSetWithServerId = async (
+  workoutExerciseLocalId: number,
+  reps: number,
+  weight: number | null,
+  rpe: number | null,
+  serverId: string,
+  originalClientId?: string | null
+): Promise<{ id: number; client_id: string | null }> => {
+  const clientId = originalClientId || generateClientId();
+
+  if (isUsingFallbackDatabase()) {
+    const store = getFallbackStore();
+    const id = ++store.counters.workoutSet;
+    store.workoutSets.push({
+      id,
+      client_id: clientId,
+      server_id: serverId,
+      workout_exercise_id: workoutExerciseLocalId,
+      reps,
+      weight: weight ?? null,
+      rpe: rpe ?? null,
+      done_at: null,
+      deleted_at: null,
+    });
+    return { id, client_id: clientId };
+  }
+
+  const result = await runSql(
+    `INSERT INTO workout_sets (client_id, server_id, workout_exercise_id, reps, weight, rpe, done_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [clientId, serverId, workoutExerciseLocalId, reps, weight ?? null, rpe ?? null, null]
+  );
+  return { id: result.insertId ?? 0, client_id: clientId };
 };
 
 export const updateWorkoutTitle = async (id: number, title: string): Promise<void> => {
@@ -387,7 +452,7 @@ export const removeWorkoutSet = async (id: number): Promise<void> => {
 
 export const setWorkoutExerciseServerId = async (
   clientId: string,
-  serverId: number
+  serverId: string
 ): Promise<void> => {
   if (isUsingFallbackDatabase()) {
     const store = getFallbackStore();
@@ -405,7 +470,7 @@ export const setWorkoutExerciseServerId = async (
 
 export const setWorkoutSetServerId = async (
   clientId: string,
-  serverId: number
+  serverId: string
 ): Promise<void> => {
   if (isUsingFallbackDatabase()) {
     const store = getFallbackStore();
@@ -420,7 +485,7 @@ export const setWorkoutSetServerId = async (
 
 export const setWorkoutServerId = async (
   clientId: string,
-  serverId: number
+  serverId: string
 ): Promise<void> => {
   if (!clientId) {
     return;
@@ -456,6 +521,31 @@ export const deleteWorkout = async (id: number): Promise<void> => {
   }
 
   await runSql('DELETE FROM workouts WHERE id = ?', [id]);
+};
+
+export const deleteWorkoutExercisesAndSets = async (workoutLocalId: number): Promise<void> => {
+  if (isUsingFallbackDatabase()) {
+    const store = getFallbackStore();
+    const exerciseIds = store.workoutExercises
+      .filter((ex) => ex.workout_id === workoutLocalId)
+      .map((ex) => ex.id);
+    store.workoutSets = store.workoutSets.filter(
+      (set) => !exerciseIds.includes(set.workout_exercise_id)
+    );
+    store.workoutExercises = store.workoutExercises.filter(
+      (ex) => ex.workout_id !== workoutLocalId
+    );
+    return;
+  }
+
+  await withTransaction(async (tx: SQLTransaction) => {
+    await execute(
+      tx,
+      `DELETE FROM workout_sets WHERE workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id = ?)`,
+      [workoutLocalId]
+    );
+    await execute(tx, 'DELETE FROM workout_exercises WHERE workout_id = ?', [workoutLocalId]);
+  });
 };
 
 export const clearAll = async (): Promise<void> => {

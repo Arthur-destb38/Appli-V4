@@ -7,7 +7,7 @@ export type DatabaseConnection = SQLiteDatabase;
 export type WorkoutRow = {
   id: number;
   client_id: string | null;
-  server_id: number | null;
+  server_id: string | null;
   user_id: string | null;
   title: string;
   status: string;
@@ -19,7 +19,7 @@ export type WorkoutRow = {
 export type WorkoutExerciseRow = {
   id: number;
   client_id: string | null;
-  server_id: number | null;
+  server_id: string | null;
   workout_id: number;
   exercise_id: string;
   order_index: number;
@@ -30,7 +30,7 @@ export type WorkoutExerciseRow = {
 export type WorkoutSetRow = {
   id: number;
   client_id: string | null;
-  server_id: number | null;
+  server_id: string | null;
   workout_exercise_id: number;
   reps: number;
   weight: number | null;
@@ -141,7 +141,7 @@ export const runMigrations = (db: DatabaseConnection) => {
       `CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_id TEXT,
-        server_id INTEGER,
+        server_id TEXT,
         user_id TEXT,
         title TEXT NOT NULL,
         status TEXT NOT NULL,
@@ -151,14 +151,14 @@ export const runMigrations = (db: DatabaseConnection) => {
       );`
     );
     ensureColumn('workouts', 'client_id', 'TEXT');
-    ensureColumn('workouts', 'server_id', 'INTEGER');
+    ensureColumn('workouts', 'server_id', 'TEXT');
     ensureColumn('workouts', 'user_id', 'TEXT');
     ensureColumn('workouts', 'deleted_at', 'INTEGER');
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS workout_exercises (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_id TEXT,
-        server_id INTEGER,
+        server_id TEXT,
         workout_id INTEGER NOT NULL,
         exercise_id TEXT NOT NULL,
         order_index INTEGER NOT NULL,
@@ -167,14 +167,14 @@ export const runMigrations = (db: DatabaseConnection) => {
       );`
     );
     ensureColumn('workout_exercises', 'client_id', 'TEXT');
-    ensureColumn('workout_exercises', 'server_id', 'INTEGER');
+    ensureColumn('workout_exercises', 'server_id', 'TEXT');
     ensureColumn('workout_exercises', 'deleted_at', 'INTEGER');
     ensureColumn('workout_exercises', 'planned_sets', 'INTEGER');
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS workout_sets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_id TEXT,
-        server_id INTEGER,
+        server_id TEXT,
         workout_exercise_id INTEGER NOT NULL,
         reps INTEGER NOT NULL,
         weight REAL,
@@ -185,7 +185,7 @@ export const runMigrations = (db: DatabaseConnection) => {
       );`
     );
     ensureColumn('workout_sets', 'client_id', 'TEXT');
-    ensureColumn('workout_sets', 'server_id', 'INTEGER');
+    ensureColumn('workout_sets', 'server_id', 'TEXT');
     ensureColumn('workout_sets', 'deleted_at', 'INTEGER');
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS mutation_queue (

@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 import random
 from collections import defaultdict
 
-from ..db import get_session
+from ..db import get_session, set_session_user_id
 from ..models import Program, ProgramSession, ProgramSet, Exercise, Workout, WorkoutExercise, Set, User
 from ..schemas import ProgramCreate, ProgramRead
 from ..utils.auth import decode_token
@@ -119,6 +119,7 @@ def _get_current_user_required(
         user = session.get(User, user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
+        set_session_user_id(session, str(user.id))
         return user
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")

@@ -13,7 +13,11 @@ import {
   addWorkoutExercise,
   addWorkoutSet,
   createWorkout,
+  createWorkoutWithServerId,
+  createExerciseWithServerId,
+  createSetWithServerId,
   deleteWorkout,
+  deleteWorkoutExercisesAndSets,
   fetchWorkouts,
   removeWorkoutExercise,
   removeWorkoutSet,
@@ -36,6 +40,7 @@ import {
 import { getLastPullTimestamp, setLastPullTimestamp } from '@/db/sync-state';
 import { pullChanges, pushMutations, SyncEvent } from '@/services/syncClient';
 import { shareWorkoutRemote } from '@/services/shareWorkoutApi';
+import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 
 interface WorkoutsContextValue {
@@ -74,7 +79,26 @@ const isNavigatorOnline = () => {
   return navigator.onLine;
 };
 
+type RemoteExercise = {
+  server_id: string;
+  client_id: string | null;
+  exercise_id: string;
+  order_index: number;
+  planned_sets: number | null;
+  sets: RemoteSet[];
+};
+
+type RemoteSet = {
+  server_id: string;
+  client_id: string | null;
+  reps: number | null;
+  weight: number | null;
+  rpe: number | null;
+  done_at: string | null;
+};
+
 export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
+  const { isAuthenticated } = useAuth();
   const { profile } = useUserProfile();
   const [workouts, setWorkouts] = useState<WorkoutWithRelations[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,6 +118,18 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setWorkouts([]);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      load();
+    }
+  }, [isAuthenticated, load]);
+
   const refreshPendingCount = useCallback(async () => {
     const count = await countPendingMutations();
     setPendingCount(count);
@@ -103,139 +139,121 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
   const applyRemoteEvent = useCallback(async (event: SyncEvent) => {
     try {
       switch (event.action) {
-        case 'update-title': {
-          const { workoutId, title } = event.payload as { workoutId: number; title: string };
-          if (typeof workoutId === 'number' && typeof title === 'string') {
-            await updateWorkoutTitle(workoutId, title);
-          }
-          break;
-        }
-        case 'complete-workout': {
-          const { workoutId } = event.payload as { workoutId: number };
-          if (typeof workoutId === 'number') {
-            await updateWorkoutStatus(workoutId, 'completed');
-          }
-          break;
-        }
-        case 'delete-workout': {
-          const { workoutId } = event.payload as { workoutId: number };
-          if (typeof workoutId === 'number') {
-            await deleteWorkout(workoutId);
-          }
-          break;
-        }
-        case 'add-exercise': {
-          const { workoutId, exerciseId, orderIndex, plannedSets } = event.payload as {
-            workoutId: number;
-            exerciseId: string;
-            orderIndex?: number;
-            plannedSets?: number | null;
-          };
-          if (typeof workoutId === 'number' && typeof exerciseId === 'string') {
-            await addWorkoutExercise(workoutId, exerciseId, orderIndex ?? 0, plannedSets ?? null);
-          }
-          break;
-        }
-        case 'update-exercise-plan': {
-          const { workoutExerciseId, plannedSets } = event.payload as {
-            workoutExerciseId: number;
-            plannedSets?: number | null;
-          };
-          if (typeof workoutExerciseId === 'number') {
-            await updateWorkoutExercisePlan(
-              workoutExerciseId,
-              typeof plannedSets === 'number' ? plannedSets : null
-            );
-          }
-          break;
-        }
-        case 'remove-exercise': {
-          const { workoutExerciseId } = event.payload as { workoutExerciseId: number };
-          if (typeof workoutExerciseId === 'number') {
-            await removeWorkoutExercise(workoutExerciseId);
-          }
-          break;
-        }
-        case 'add-set': {
-          const { workoutExerciseId, payload } = event.payload as {
-            workoutExerciseId: number;
-            payload: { reps: number; weight?: number | null; rpe?: number | null };
-          };
-          if (typeof workoutExerciseId === 'number' && payload) {
-            await addWorkoutSet(workoutExerciseId, payload.reps, payload.weight, payload.rpe);
-          }
-          break;
-        }
-        case 'update-set': {
-          const { setId, updates } = event.payload as {
-            setId: number;
-            updates: Partial<{
-              reps: number;
-              weight: number | null;
-              rpe: number | null;
-              done_at: number | null;
-            }>;
-          };
-          if (typeof setId === 'number' && updates) {
-            await updateWorkoutSet(setId, updates);
-          }
-          break;
-        }
-        case 'remove-set': {
-          const { setId } = event.payload as { setId: number };
-          if (typeof setId === 'number') {
-            await removeWorkoutSet(setId);
-          }
-          break;
-        }
         case 'workout-upsert': {
           const payload = event.payload as {
-            server_id: number;
+            server_id: string;
             client_id: string | null;
+            user_id: string | null;
             title: string;
             status: 'draft' | 'completed';
             created_at: string;
             updated_at: string;
             deleted_at: string | null;
+            exercises?: RemoteExercise[];
           };
-          if (payload.server_id && payload.client_id) {
-            try {
-              // Mettre à jour le server_id si nécessaire
-              await setWorkoutServerId(payload.client_id, payload.server_id);
-              // Trouver le workout local par server_id ou client_id
-              const localWorkouts = await fetchWorkouts();
-              const workout = localWorkouts.find(
-                (w) => w.workout.server_id === payload.server_id || w.workout.client_id === payload.client_id
+          if (!payload.server_id) break;
+          try {
+            const localWorkouts = await fetchWorkouts();
+            let existing = localWorkouts.find(
+              (w) => w.workout.server_id === payload.server_id
+            );
+            if (!existing && payload.client_id) {
+              existing = localWorkouts.find(
+                (w) => w.workout.client_id === payload.client_id
               );
-              if (workout) {
-                // Mettre à jour le titre et le statut si nécessaire
-                if (workout.workout.title !== payload.title) {
-                  await updateWorkoutTitle(workout.workout.id, payload.title);
-                }
-                if (workout.workout.status !== payload.status) {
-                  await updateWorkoutStatus(workout.workout.id, payload.status);
-                }
-              } else {
-                // Créer le workout s'il n'existe pas localement
-                await createWorkout(payload.title);
-                // Mettre à jour le server_id après création
-                const newWorkouts = await fetchWorkouts();
-                const newWorkout = newWorkouts.find((w) => w.workout.client_id === payload.client_id);
-                if (newWorkout) {
-                  await setWorkoutServerId(payload.client_id, payload.server_id);
-                  if (newWorkout.workout.status !== payload.status) {
-                    await updateWorkoutStatus(newWorkout.workout.id, payload.status);
+            }
+
+            if (existing) {
+              if (payload.client_id) {
+                await setWorkoutServerId(payload.client_id, payload.server_id);
+              }
+              if (existing.workout.title !== payload.title) {
+                await updateWorkoutTitle(existing.workout.id, payload.title);
+              }
+              if (existing.workout.status !== payload.status) {
+                await updateWorkoutStatus(existing.workout.id, payload.status);
+              }
+              if (payload.exercises && payload.exercises.length > 0) {
+                await deleteWorkoutExercisesAndSets(existing.workout.id);
+                for (const ex of payload.exercises) {
+                  const { id: exLocalId } = await createExerciseWithServerId(
+                    existing.workout.id,
+                    ex.exercise_id,
+                    ex.order_index,
+                    ex.planned_sets,
+                    ex.server_id,
+                    ex.client_id
+                  );
+                  for (const s of ex.sets || []) {
+                    await createSetWithServerId(
+                      exLocalId,
+                      s.reps ?? 0,
+                      s.weight,
+                      s.rpe,
+                      s.server_id,
+                      s.client_id
+                    );
                   }
                 }
               }
-            } catch (error) {
-              console.warn('Failed to apply workout-upsert', error);
+            } else if (!payload.deleted_at) {
+              const created = await createWorkoutWithServerId(
+                payload.title,
+                payload.server_id,
+                payload.user_id,
+                payload.client_id
+              );
+              if (payload.status !== 'draft') {
+                await updateWorkoutStatus(created.id, payload.status);
+              }
+              if (payload.exercises) {
+                for (const ex of payload.exercises) {
+                  const { id: exLocalId } = await createExerciseWithServerId(
+                    created.id,
+                    ex.exercise_id,
+                    ex.order_index,
+                    ex.planned_sets,
+                    ex.server_id,
+                    ex.client_id
+                  );
+                  for (const s of ex.sets || []) {
+                    await createSetWithServerId(
+                      exLocalId,
+                      s.reps ?? 0,
+                      s.weight,
+                      s.rpe,
+                      s.server_id,
+                      s.client_id
+                    );
+                  }
+                }
+              }
             }
+          } catch (error) {
+            console.warn('Failed to apply workout-upsert', error);
+          }
+          break;
+        }
+        case 'workout-delete': {
+          const payload = event.payload as { server_id: string; client_id: string | null };
+          if (!payload.server_id) break;
+          try {
+            const localWorkouts = await fetchWorkouts();
+            const workout = localWorkouts.find(
+              (w) => w.workout.server_id === payload.server_id
+            ) || (payload.client_id ? localWorkouts.find(
+              (w) => w.workout.client_id === payload.client_id
+            ) : undefined);
+            if (workout) {
+              await deleteWorkout(workout.workout.id);
+            }
+          } catch (error) {
+            console.warn('Failed to apply workout-delete from server', error);
           }
           break;
         }
         default:
-          console.warn('Unhandled sync event action', event.action);
+          break;
       }
     } catch (error) {
       console.warn(`Failed to apply remote event ${event.action}`, error);
@@ -377,14 +395,14 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
   }, [pullFromServer, refreshPendingCount]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     const bootstrap = async () => {
-      await refreshPendingCount();
-      // Forcer un pull complet depuis le début (timestamp 0)
       await pullFromServer(0);
+      await refreshPendingCount();
       await flushQueue();
     };
     bootstrap().catch((error) => console.warn('Failed to initialize sync', error));
-  }, [flushQueue, pullFromServer, refreshPendingCount, profile?.id]);
+  }, [isAuthenticated, flushQueue, pullFromServer, refreshPendingCount]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
@@ -455,10 +473,23 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
 
   const updateTitleAction = useCallback(
     async (id: number, title: string) => {
-      await updateWorkoutTitle(id, title);
-      await refresh();
+      const target = workouts.find((item) => item.workout.id === id);
+      await runMutation(
+        'update-title',
+        {
+          workoutId: target?.workout.server_id ?? id,
+          workoutClientId: target?.workout.client_id ?? null,
+          client_id: target?.workout.client_id ?? null,
+          title,
+          updated_at: Date.now(),
+        },
+        async () => {
+          await updateWorkoutTitle(id, title);
+          await refresh();
+        }
+      );
     },
-    [refresh]
+    [refresh, runMutation, workouts]
   );
 
   const addExerciseAction = useCallback(
@@ -483,7 +514,15 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       );
       await runMutation(
         'add-exercise',
-        { workoutId, exerciseId, orderIndex, client_id, plannedSets },
+        {
+          workoutId,
+          workoutClientId: target?.workout.client_id ?? null,
+          workoutServerId: target?.workout.server_id ?? null,
+          exerciseId,
+          orderIndex,
+          client_id,
+          plannedSets,
+        },
         async () => {
           await refresh();
         }
@@ -495,46 +534,86 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
 
   const removeExerciseAction = useCallback(
     async (workoutExerciseId: number) => {
-      await runMutation('remove-exercise', { workoutExerciseId }, async () => {
-        await removeWorkoutExercise(workoutExerciseId);
-        await refresh();
-      });
+      const exercise = workouts
+        .flatMap((w) => w.exercises)
+        .find((ex) => ex.id === workoutExerciseId);
+      await runMutation(
+        'remove-exercise',
+        {
+          workoutExerciseId,
+          exerciseClientId: exercise?.client_id ?? null,
+          client_id: exercise?.client_id ?? null,
+        },
+        async () => {
+          await removeWorkoutExercise(workoutExerciseId);
+          await refresh();
+        }
+      );
     },
-    [refresh, runMutation]
+    [refresh, runMutation, workouts]
   );
 
   const updateExercisePlanAction = useCallback(
     async (workoutExerciseId: number, plannedSets: number | null) => {
+      const exercise = workouts
+        .flatMap((w) => w.exercises)
+        .find((ex) => ex.id === workoutExerciseId);
       await runMutation(
         'update-exercise-plan',
-        { workoutExerciseId, plannedSets },
+        {
+          workoutExerciseId,
+          exerciseClientId: exercise?.client_id ?? null,
+          client_id: exercise?.client_id ?? null,
+          plannedSets,
+        },
         async () => {
           await updateWorkoutExercisePlan(workoutExerciseId, plannedSets);
           await refresh();
         }
       );
     },
-    [refresh, runMutation]
+    [refresh, runMutation, workouts]
   );
 
   const deleteWorkoutAction = useCallback(
     async (id: number) => {
-      await runMutation('delete-workout', { workoutId: id }, async () => {
-        await deleteWorkout(id);
-        await refresh();
-      });
+      const target = workouts.find((item) => item.workout.id === id);
+      await runMutation(
+        'delete-workout',
+        {
+          workoutId: target?.workout.server_id ?? id,
+          workoutClientId: target?.workout.client_id ?? null,
+          client_id: target?.workout.client_id ?? null,
+          deleted_at: Date.now(),
+          updated_at: Date.now(),
+        },
+        async () => {
+          await deleteWorkout(id);
+          await refresh();
+        }
+      );
     },
-    [refresh, runMutation]
+    [refresh, runMutation, workouts]
   );
 
   const completeWorkoutAction = useCallback(
     async (id: number) => {
-      await runMutation('complete-workout', { workoutId: id }, async () => {
-        await updateWorkoutStatus(id, 'completed');
-        await refresh();
-      });
+      const target = workouts.find((item) => item.workout.id === id);
+      await runMutation(
+        'complete-workout',
+        {
+          workoutId: target?.workout.server_id ?? id,
+          workoutClientId: target?.workout.client_id ?? null,
+          client_id: target?.workout.client_id ?? null,
+          updated_at: Date.now(),
+        },
+        async () => {
+          await updateWorkoutStatus(id, 'completed');
+          await refresh();
+        }
+      );
     },
-    [refresh, runMutation]
+    [refresh, runMutation, workouts]
   );
 
   const addSetAction = useCallback(
@@ -542,6 +621,9 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       workoutExerciseId: number,
       payload: { reps: number; weight?: number | null; rpe?: number | null }
     ) => {
+      const exercise = workouts
+        .flatMap((w) => w.exercises)
+        .find((ex) => ex.id === workoutExerciseId);
       const { client_id } = await addWorkoutSet(
         workoutExerciseId,
         payload.reps,
@@ -550,13 +632,18 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       );
       await runMutation(
         'add-set',
-        { workoutExerciseId, client_id, payload },
+        {
+          workoutExerciseId,
+          exerciseClientId: exercise?.client_id ?? null,
+          client_id,
+          payload,
+        },
         async () => {
           await refresh();
         }
       );
     },
-    [refresh, runMutation]
+    [refresh, runMutation, workouts]
   );
 
   const updateSetAction = useCallback(
@@ -564,22 +651,45 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       setId: number,
       updates: Partial<{ reps: number; weight: number | null; rpe: number | null; done_at: number | null }>
     ) => {
-      await runMutation('update-set', { setId, updates }, async () => {
-        await updateWorkoutSet(setId, updates);
-        await refresh();
-      });
+      const targetSet = workouts
+        .flatMap((w) => w.sets)
+        .find((s) => s.id === setId);
+      await runMutation(
+        'update-set',
+        {
+          setId,
+          setClientId: targetSet?.client_id ?? null,
+          client_id: targetSet?.client_id ?? null,
+          updates,
+        },
+        async () => {
+          await updateWorkoutSet(setId, updates);
+          await refresh();
+        }
+      );
     },
-    [refresh, runMutation]
+    [refresh, runMutation, workouts]
   );
 
   const removeSetAction = useCallback(
     async (setId: number) => {
-      await runMutation('remove-set', { setId }, async () => {
-        await removeWorkoutSet(setId);
-        await refresh();
-      });
+      const targetSet = workouts
+        .flatMap((w) => w.sets)
+        .find((s) => s.id === setId);
+      await runMutation(
+        'remove-set',
+        {
+          setId,
+          setClientId: targetSet?.client_id ?? null,
+          client_id: targetSet?.client_id ?? null,
+        },
+        async () => {
+          await removeWorkoutSet(setId);
+          await refresh();
+        }
+      );
     },
-    [refresh, runMutation]
+    [refresh, runMutation, workouts]
   );
 
   const duplicateWorkoutAction = useCallback(
@@ -643,13 +753,8 @@ export const WorkoutsProvider = ({ children }: PropsWithChildren) => {
       if (!profile) {
         throw new Error('Profil utilisateur indisponible');
       }
-      // Mode démo : ne pas bloquer sur le consentement
-      // if (!profile.consent_to_public_share) {
-      //   throw new Error('consent_required');
-      // }
 
       const profileId = profile.id;
-      // Utiliser client_id (UUID) pour l'API au lieu de id (number local)
       const workoutIdForApi = target.workout.client_id || String(id);
       const payload = { workoutId: workoutIdForApi, userId: profileId };
 

@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from ..db import get_session
+from ..db import get_session, set_session_user_id
 from ..models import Follower, Share, User, Comment, Like
 from ..schemas import FeedResponse, FeedItem, FollowRequest
 from ..utils.auth import decode_token
@@ -29,7 +29,10 @@ def _get_current_user_optional(
         if payload.get("type") != "access":
             return None
         user_id = payload.get("sub")
-        return session.get(User, user_id)
+        user = session.get(User, user_id)
+        if user:
+            set_session_user_id(session, str(user.id))
+        return user
     except Exception:
         return None
 
@@ -50,6 +53,7 @@ def _get_current_user_required(
         user = session.get(User, user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
+        set_session_user_id(session, str(user.id))
         return user
     except ValueError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")

@@ -9,7 +9,7 @@ export type PushMutationPayload = {
 
 export type PushMutationAck = {
   queue_id: number;
-  server_id: number;
+  server_id: string;
 };
 
 export type PushResponse = {
@@ -43,7 +43,7 @@ export const pushMutations = async (
 };
 
 export type SyncEvent = {
-  id: number;
+  id: string;
   action: string;
   payload: unknown;
   created_at: number;

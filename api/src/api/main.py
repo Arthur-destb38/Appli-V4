@@ -31,7 +31,7 @@ from .routes import admin
 from .seeds import seed_exercises
 from .services.exercise_loader import import_exercises_from_url
 from sqlmodel import Session, select, func
-from .db import get_engine
+from .db import get_engine, set_session_user_id
 from .models import Exercise, User
 from .utils.auth import hash_password
 
@@ -46,6 +46,8 @@ def ensure_demo_user() -> None:
             if not demo:
                 demo = session.exec(select(User).where(User.email == "demo@gorillax.local")).first()
             if demo:
+                # RLS : autoriser l'UPDATE en définissant le contexte "utilisateur courant"
+                set_session_user_id(session, str(demo.id))
                 demo.username = "demo"
                 demo.email = "demo@gorillax.local"
                 demo.password_hash = hash_password("DemoPassword123")

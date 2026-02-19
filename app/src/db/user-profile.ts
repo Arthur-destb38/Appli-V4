@@ -86,3 +86,13 @@ export const upsertUserProfile = async (profile: {
     created_at: createdAt,
   };
 };
+
+/** Vide le profil utilisateur local (à appeler au logout pour isoler les comptes). */
+export const clearUserProfile = async (): Promise<void> => {
+  if (isUsingFallbackDatabase()) {
+    const store = getFallbackStore();
+    store.userProfile = null;
+    return;
+  }
+  await runSql('DELETE FROM user_profile');
+};
